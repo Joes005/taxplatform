@@ -1,0 +1,44 @@
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.sqlite3
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# --- Environment / Secrets ---
+.env
+.env.*
+!.env.example
+!*/.env.example
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+*.tsbuildinfo
+
+# --- Docker ---
+*.pid
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Alembic (keep versions, ignore local db) ---
+*.db

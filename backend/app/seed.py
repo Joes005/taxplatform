@@ -1,0 +1,108 @@
+"""Idempotent seed script for roles, permissions, and the bootstrap super admin.
+
+Run with: python -m app.seed
+Safe to run multiple times — existing rows are left untouched or updated,
+never duplicated.
+"""
+
+import asyncio
+import logging
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.database import AsyncSessionLocal
+from app.core.permissions import PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_PERMISSIONS, RoleCode
+from app.core.security import hash_password
+from app.models import Permission, Role, RolePermission, User
+
+logger = logging.getLogger(__name__)
+
+
+async def seed_permissions(db: AsyncSession) -> dict[str, Permission]:
+    result = await db.execute(select(Permission))
+    existing = {p.code: p for p in result.scalars().all()}
+
+    for code, module, description in PERMISSIONS:
+        if code.value in existing:
+            continue
+        permission = Permission(code=code.value, module=module, description=description)
+        db.add(permission)
+        existing[code.value] = permission
+
+    await db.flush()
+    return existing
+
+
+async def seed_roles(db: AsyncSession) -> dict[str, Role]:
+    result = await db.execute(select(Role))
+    existing = {r.code: r for r in result.scalars().all()}
+
+    for role_code in RoleCode:
+        if role_code.value in existing:
+            continue
+        role = Role(
+            code=role_code.value,
+            name=role_code.value.replace("_", " ").title(),
+            description=ROLE_DESCRIPTIONS[role_code],
+            is_system_role=True,
+        )
+        db.add(role)
+        existing[role_code.value] = role
+
+    await db.flush()
+    return existing
+
+
+async def seed_role_permissions(
+    db: AsyncSession, roles: dict[str, Role], permissions: dict[str, Permission]
+) -> None:
+    result = await db.execute(select(RolePermission))
+    existing_pairs = {(rp.role_id, rp.permission_id) for rp in result.scalars().all()}
+
+    for role_code, permission_codes in ROLE_PERMISSIONS.items():
+        role = roles[role_code.value]
+        for permission_code in permission_codes:
+            permission = permissions[permission_code.value]
+            if (role.id, permission.id) in existing_pairs:
+                continue
+            db.add(RolePermission(role_id=role.id, permission_id=permission.id))
+            existing_pairs.add((role.id, permission.id))
+
+
+async def seed_super_admin(db: AsyncSession) -> None:
+    result = await db.execute(select(User).where(User.email == settings.SEED_SUPER_ADMIN_EMAIL.lower()))
+    if result.scalar_one_or_none() is not None:
+        return
+
+    admin = User(
+        email=settings.SEED_SUPER_ADMIN_EMAIL.lower(),
+        password_hash=hash_password(settings.SEED_SUPER_ADMIN_PASSWORD),
+        first_name=settings.SEED_SUPER_ADMIN_FIRST_NAME,
+        last_name=settings.SEED_SUPER_ADMIN_LAST_NAME,
+        is_active=True,
+        is_verified=True,
+        is_platform_super_admin=True,
+    )
+    db.add(admin)
+    logger.info("Seeded platform super admin: %s", admin.email)
+
+
+async def run_seed() -> None:
+    async with AsyncSessionLocal() as db:
+        permissions = await seed_permissions(db)
+        roles = await seed_roles(db)
+        await seed_role_permissions(db, roles, permissions)
+        await seed_super_admin(db)
+        await db.commit()
+    logger.info("Seed complete.")
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(run_seed())
+
+
+if __name__ == "__main__":
+    main()
