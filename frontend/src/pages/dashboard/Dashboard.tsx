@@ -11,9 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/utils";
 
 const MODULE_PLACEHOLDERS = [
-  { title: "GST Compliance", subtitle: "Coming in Phase 2", icon: FileText, status: "planned" as const },
-  { title: "TDS Compliance", subtitle: "Coming in Phase 3", icon: Landmark, status: "planned" as const },
-  { title: "Reconciliation", subtitle: "Coming in Phase 4", icon: GitMerge, status: "planned" as const },
+  { title: "Documents", subtitle: "Available now", icon: FileText, status: "available" as const },
+  { title: "GST Compliance", subtitle: "Coming in Phase 3", icon: Landmark, status: "planned" as const },
+  { title: "TDS Compliance", subtitle: "Coming in Phase 4", icon: Landmark, status: "planned" as const },
+  { title: "Reconciliation", subtitle: "Coming in Phase 5", icon: GitMerge, status: "planned" as const },
   { title: "Audit", subtitle: "Foundation available", icon: ShieldCheck, status: "available" as const },
 ];
 
@@ -131,6 +132,7 @@ export default function DashboardPage() {
             <CardDescription>Jump to common tasks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
+            <QuickAction to="/documents" label="Upload a document" icon={FileText} />
             <QuickAction to="/companies" label="View companies" icon={Building2} />
             <QuickAction to="/users" label="Manage users" icon={Users} />
             <QuickAction to="/audit-logs" label="Review audit logs" icon={ScrollText} />

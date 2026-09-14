@@ -127,3 +127,53 @@ export interface AuditLog {
   log_metadata: Record<string, unknown> | null;
   created_at: string;
 }
+
+export const DOCUMENT_TYPES = [
+  "SALES_INVOICE",
+  "PURCHASE_INVOICE",
+  "EXPENSE_BILL",
+  "BANK_STATEMENT",
+  "GST_REPORT",
+  "TDS_DOCUMENT",
+  "INCOME_TAX_DOCUMENT",
+  "FINANCIAL_STATEMENT",
+  "OTHER",
+] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+export const DOCUMENT_STATUSES = [
+  "UPLOADED",
+  "PROCESSING",
+  "READY",
+  "REVIEW_REQUIRED",
+  "VERIFIED",
+  "ARCHIVED",
+  "FAILED",
+] as const;
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
+
+export const SUPPORTED_UPLOAD_EXTENSIONS = ["pdf", "jpg", "jpeg", "png", "xlsx", "xls", "csv"];
+
+export interface DocumentUploaderSummary {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface Document {
+  id: string;
+  original_filename: string;
+  document_type: DocumentType;
+  status: DocumentStatus;
+  mime_type: string;
+  file_extension: string;
+  file_size: number;
+  checksum: string;
+  description: string | null;
+  uploaded_by: DocumentUploaderSummary;
+  uploaded_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  is_archived: boolean;
+}

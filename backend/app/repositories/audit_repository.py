@@ -23,6 +23,7 @@ class AuditRepository:
         action: str | None = None,
         user_id: uuid.UUID | None = None,
         resource_type: str | None = None,
+        resource_id: str | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         offset: int = 0,
@@ -38,6 +39,8 @@ class AuditRepository:
             query = query.where(AuditLog.user_id == user_id)
         if resource_type is not None:
             query = query.where(AuditLog.resource_type == resource_type)
+        if resource_id is not None:
+            query = query.where(AuditLog.resource_id == resource_id)
         if date_from is not None:
             query = query.where(AuditLog.created_at >= date_from)
         if date_to is not None:

@@ -1,3 +1,8 @@
+import shutil
+import tempfile
+import uuid
+from pathlib import Path
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -7,8 +12,10 @@ from app.core.database import Base, get_db
 from app.core.permissions import RoleCode
 from app.core.security import hash_password
 from app.main import app
-from app.models import Company, CompanyMembership, MembershipStatus, User
+from app.models import Company, CompanyMembership, MembershipStatus, Role, User
 from app.seed import seed_permissions, seed_role_permissions, seed_roles
+from app.storage import get_storage_provider
+from app.storage.local import LocalStorageProvider
 
 TEST_DATABASE_URL = settings.DATABASE_URL.rsplit("/", 1)[0] + "/taxplatform_test"
 
@@ -149,6 +156,50 @@ async def company_b_with_admin(db_session, seeded_rbac):
         legal_name="Company B Traders",
         admin_email="admin-b@example.com",
     )
+
+
+@pytest_asyncio.fixture
+async def document_storage():
+    """Each test gets an isolated temp directory as its document store, so
+    upload tests never touch (or depend on) the real ./storage directory.
+    """
+    temp_dir = tempfile.mkdtemp(prefix="taxplatform-test-storage-")
+    provider = LocalStorageProvider(temp_dir)
+
+    def override_get_storage_provider():
+        return provider
+
+    app.dependency_overrides[get_storage_provider] = override_get_storage_provider
+
+    yield provider
+
+    app.dependency_overrides.pop(get_storage_provider, None)
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+async def add_membership(
+    db_session,
+    roles: dict[str, Role],
+    *,
+    company_id: uuid.UUID,
+    email: str,
+    role_code: str,
+    password: str = "TestPass1!",
+) -> User:
+    """Creates a user and an ACTIVE membership for `company_id` under the
+    given role code — shared by any test that needs a non-admin user with a
+    specific role (accountant, auditor, ...) inside an existing company.
+    """
+    user = await _create_user(db_session, email=email, password=password)
+    membership = CompanyMembership(
+        user_id=user.id,
+        company_id=company_id,
+        role_id=roles[role_code].id,
+        status=MembershipStatus.ACTIVE,
+    )
+    db_session.add(membership)
+    await db_session.flush()
+    return user
 
 
 async def login(client: AsyncClient, email: str, password: str) -> dict:

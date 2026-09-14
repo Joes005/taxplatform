@@ -30,6 +30,15 @@ class PermissionCode(StrEnum):
 
     DASHBOARD_VIEW = "DASHBOARD_VIEW"
 
+    DOCUMENT_VIEW = "DOCUMENT_VIEW"
+    DOCUMENT_UPLOAD = "DOCUMENT_UPLOAD"
+    DOCUMENT_UPDATE = "DOCUMENT_UPDATE"
+    DOCUMENT_ARCHIVE = "DOCUMENT_ARCHIVE"
+    DOCUMENT_RESTORE = "DOCUMENT_RESTORE"
+    DOCUMENT_DOWNLOAD = "DOCUMENT_DOWNLOAD"
+    DOCUMENT_DELETE = "DOCUMENT_DELETE"
+    DOCUMENT_MANAGE = "DOCUMENT_MANAGE"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -54,6 +63,14 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.ROLE_ASSIGN, "ROLE", "Assign roles to users"),
     (PermissionCode.AUDIT_LOG_VIEW, "AUDIT", "View audit logs"),
     (PermissionCode.DASHBOARD_VIEW, "DASHBOARD", "View dashboard"),
+    (PermissionCode.DOCUMENT_VIEW, "DOCUMENT", "View documents and their metadata"),
+    (PermissionCode.DOCUMENT_UPLOAD, "DOCUMENT", "Upload new documents"),
+    (PermissionCode.DOCUMENT_UPDATE, "DOCUMENT", "Update document metadata"),
+    (PermissionCode.DOCUMENT_ARCHIVE, "DOCUMENT", "Archive documents"),
+    (PermissionCode.DOCUMENT_RESTORE, "DOCUMENT", "Restore archived documents"),
+    (PermissionCode.DOCUMENT_DOWNLOAD, "DOCUMENT", "Download document files"),
+    (PermissionCode.DOCUMENT_DELETE, "DOCUMENT", "Permanently delete documents"),
+    (PermissionCode.DOCUMENT_MANAGE, "DOCUMENT", "Full document module administration"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -75,16 +92,28 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.ROLE_ASSIGN,
         PermissionCode.DASHBOARD_VIEW,
         PermissionCode.AUDIT_LOG_VIEW,
+        PermissionCode.DOCUMENT_VIEW,
+        PermissionCode.DOCUMENT_UPLOAD,
+        PermissionCode.DOCUMENT_UPDATE,
+        PermissionCode.DOCUMENT_ARCHIVE,
+        PermissionCode.DOCUMENT_RESTORE,
+        PermissionCode.DOCUMENT_DOWNLOAD,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
         PermissionCode.USER_VIEW,
         PermissionCode.DASHBOARD_VIEW,
+        PermissionCode.DOCUMENT_VIEW,
+        PermissionCode.DOCUMENT_UPLOAD,
+        PermissionCode.DOCUMENT_UPDATE,
+        PermissionCode.DOCUMENT_DOWNLOAD,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
         PermissionCode.DASHBOARD_VIEW,
         PermissionCode.AUDIT_LOG_VIEW,
+        PermissionCode.DOCUMENT_VIEW,
+        PermissionCode.DOCUMENT_DOWNLOAD,
     ],
 }
 

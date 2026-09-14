@@ -42,3 +42,6 @@ logs/
 
 # --- Alembic (keep versions, ignore local db) ---
 *.db
+
+# --- Local document storage (Phase 2) ---
+backend/storage/

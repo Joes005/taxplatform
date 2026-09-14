@@ -10,6 +10,7 @@ import DashboardPage from "@/pages/dashboard/Dashboard";
 import CompaniesListPage from "@/pages/companies/CompaniesList";
 import CompanyDetailsPage from "@/pages/companies/CompanyDetails";
 import UsersPage from "@/pages/users/UsersPage";
+import DocumentsPage from "@/pages/documents/DocumentsPage";
 import AuditLogsPage from "@/pages/audit-logs/AuditLogsPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
 import ForbiddenPage from "@/pages/errors/Forbidden";
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
           { path: "/companies", element: <CompaniesListPage /> },
           { path: "/companies/:companyId", element: <CompanyDetailsPage /> },
           { path: "/users", element: <UsersPage /> },
+          { path: "/documents", element: <DocumentsPage /> },
           { path: "/audit-logs", element: <AuditLogsPage /> },
           { path: "/settings", element: <SettingsPage /> },
         ],

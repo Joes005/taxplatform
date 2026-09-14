@@ -6,6 +6,7 @@ export interface AuditLogFilters {
   action?: string;
   userId?: string;
   resourceType?: string;
+  resourceId?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -19,6 +20,7 @@ export const auditLogService = {
     if (filters.action) params.set("action", filters.action);
     if (filters.userId) params.set("user_id", filters.userId);
     if (filters.resourceType) params.set("resource_type", filters.resourceType);
+    if (filters.resourceId) params.set("resource_id", filters.resourceId);
     if (filters.dateFrom) params.set("date_from", filters.dateFrom);
     if (filters.dateTo) params.set("date_to", filters.dateTo);
     params.set("page", String(filters.page ?? 1));

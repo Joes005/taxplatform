@@ -32,9 +32,29 @@ class Settings(BaseSettings):
     SEED_SUPER_ADMIN_FIRST_NAME: str = "Platform"
     SEED_SUPER_ADMIN_LAST_NAME: str = "Admin"
 
+    # --- Document Storage (Phase 2) ---
+    # Local filesystem only for now; see app/storage/ for the provider
+    # abstraction that will let this become S3 (or similar) later without
+    # touching the document service, API, or database model.
+    DOCUMENT_STORAGE_PATH: str = "./storage"
+    MAX_UPLOAD_SIZE_MB: int = 10
+    ALLOWED_DOCUMENT_EXTENSIONS: str = "pdf,jpg,jpeg,png,xlsx,xls,csv"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+    @property
+    def allowed_document_extensions(self) -> set[str]:
+        return {
+            ext.strip().lower().lstrip(".")
+            for ext in self.ALLOWED_DOCUMENT_EXTENSIONS.split(",")
+            if ext.strip()
+        }
 
     @property
     def is_production(self) -> bool:
