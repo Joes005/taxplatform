@@ -158,6 +158,84 @@ async def company_b_with_admin(db_session, seeded_rbac):
     )
 
 
+async def create_financial_year(
+    db_session, company_id: uuid.UUID, *, name: str = "2025-26", is_current: bool = True
+):
+    from datetime import date as _date
+
+    from app.models.financial_year import FinancialYear
+
+    fy = FinancialYear(
+        company_id=company_id,
+        name=name,
+        start_date=_date(2025, 4, 1),
+        end_date=_date(2026, 3, 31),
+        is_current=is_current,
+    )
+    db_session.add(fy)
+    await db_session.flush()
+    return fy
+
+
+@pytest_asyncio.fixture
+async def financial_year_a(db_session, company_a_with_admin):
+    company, _admin = company_a_with_admin
+    return await create_financial_year(db_session, company.id)
+
+
+@pytest_asyncio.fixture
+async def financial_year_b(db_session, company_b_with_admin):
+    company, _admin = company_b_with_admin
+    return await create_financial_year(db_session, company.id)
+
+
+async def create_customer(db_session, company_id: uuid.UUID, *, name: str = "Test Customer"):
+    from app.models.customer import Customer
+
+    customer = Customer(company_id=company_id, name=name)
+    db_session.add(customer)
+    await db_session.flush()
+    return customer
+
+
+async def create_vendor(db_session, company_id: uuid.UUID, *, name: str = "Test Vendor"):
+    from app.models.vendor import Vendor
+
+    vendor = Vendor(company_id=company_id, name=name)
+    db_session.add(vendor)
+    await db_session.flush()
+    return vendor
+
+
+async def create_ledger(
+    db_session, company_id: uuid.UUID, *, name: str = "Test Ledger", ledger_type: str = "EXPENSE"
+):
+    from app.models.ledger import Ledger
+
+    ledger = Ledger(company_id=company_id, name=name, ledger_type=ledger_type)
+    db_session.add(ledger)
+    await db_session.flush()
+    return ledger
+
+
+@pytest_asyncio.fixture
+async def customer_a(db_session, company_a_with_admin):
+    company, _admin = company_a_with_admin
+    return await create_customer(db_session, company.id)
+
+
+@pytest_asyncio.fixture
+async def vendor_a(db_session, company_a_with_admin):
+    company, _admin = company_a_with_admin
+    return await create_vendor(db_session, company.id)
+
+
+@pytest_asyncio.fixture
+async def ledger_a(db_session, company_a_with_admin):
+    company, _admin = company_a_with_admin
+    return await create_ledger(db_session, company.id)
+
+
 @pytest_asyncio.fixture
 async def document_storage():
     """Each test gets an isolated temp directory as its document store, so

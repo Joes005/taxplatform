@@ -39,6 +39,49 @@ class PermissionCode(StrEnum):
     DOCUMENT_DELETE = "DOCUMENT_DELETE"
     DOCUMENT_MANAGE = "DOCUMENT_MANAGE"
 
+    ACCOUNTING_VIEW = "ACCOUNTING_VIEW"
+    ACCOUNTING_CREATE = "ACCOUNTING_CREATE"
+    ACCOUNTING_UPDATE = "ACCOUNTING_UPDATE"
+    ACCOUNTING_DELETE = "ACCOUNTING_DELETE"
+
+    LEDGER_VIEW = "LEDGER_VIEW"
+    LEDGER_MANAGE = "LEDGER_MANAGE"
+
+    CUSTOMER_VIEW = "CUSTOMER_VIEW"
+    CUSTOMER_MANAGE = "CUSTOMER_MANAGE"
+
+    VENDOR_VIEW = "VENDOR_VIEW"
+    VENDOR_MANAGE = "VENDOR_MANAGE"
+
+    PRODUCT_VIEW = "PRODUCT_VIEW"
+    PRODUCT_MANAGE = "PRODUCT_MANAGE"
+
+    SALES_VIEW = "SALES_VIEW"
+    SALES_CREATE = "SALES_CREATE"
+    SALES_UPDATE = "SALES_UPDATE"
+    SALES_POST = "SALES_POST"
+    SALES_CANCEL = "SALES_CANCEL"
+
+    PURCHASE_VIEW = "PURCHASE_VIEW"
+    PURCHASE_CREATE = "PURCHASE_CREATE"
+    PURCHASE_UPDATE = "PURCHASE_UPDATE"
+    PURCHASE_POST = "PURCHASE_POST"
+    PURCHASE_CANCEL = "PURCHASE_CANCEL"
+
+    PAYMENT_VIEW = "PAYMENT_VIEW"
+    PAYMENT_CREATE = "PAYMENT_CREATE"
+
+    RECEIPT_VIEW = "RECEIPT_VIEW"
+    RECEIPT_CREATE = "RECEIPT_CREATE"
+
+    JOURNAL_VIEW = "JOURNAL_VIEW"
+    JOURNAL_CREATE = "JOURNAL_CREATE"
+    JOURNAL_POST = "JOURNAL_POST"
+
+    ACCOUNTING_IMPORT = "ACCOUNTING_IMPORT"
+    ACCOUNTING_IMPORT_COMMIT = "ACCOUNTING_IMPORT_COMMIT"
+    ACCOUNTING_IMPORT_VIEW = "ACCOUNTING_IMPORT_VIEW"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -71,6 +114,38 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.DOCUMENT_DOWNLOAD, "DOCUMENT", "Download document files"),
     (PermissionCode.DOCUMENT_DELETE, "DOCUMENT", "Permanently delete documents"),
     (PermissionCode.DOCUMENT_MANAGE, "DOCUMENT", "Full document module administration"),
+    (PermissionCode.ACCOUNTING_VIEW, "ACCOUNTING", "View accounting data"),
+    (PermissionCode.ACCOUNTING_CREATE, "ACCOUNTING", "Create accounting records"),
+    (PermissionCode.ACCOUNTING_UPDATE, "ACCOUNTING", "Update accounting records"),
+    (PermissionCode.ACCOUNTING_DELETE, "ACCOUNTING", "Delete/void accounting records"),
+    (PermissionCode.LEDGER_VIEW, "ACCOUNTING", "View ledgers (chart of accounts)"),
+    (PermissionCode.LEDGER_MANAGE, "ACCOUNTING", "Create and update ledgers"),
+    (PermissionCode.CUSTOMER_VIEW, "ACCOUNTING", "View customers"),
+    (PermissionCode.CUSTOMER_MANAGE, "ACCOUNTING", "Create and update customers"),
+    (PermissionCode.VENDOR_VIEW, "ACCOUNTING", "View vendors"),
+    (PermissionCode.VENDOR_MANAGE, "ACCOUNTING", "Create and update vendors"),
+    (PermissionCode.PRODUCT_VIEW, "ACCOUNTING", "View products/services"),
+    (PermissionCode.PRODUCT_MANAGE, "ACCOUNTING", "Create and update products/services"),
+    (PermissionCode.SALES_VIEW, "ACCOUNTING", "View sales invoices"),
+    (PermissionCode.SALES_CREATE, "ACCOUNTING", "Create sales invoices"),
+    (PermissionCode.SALES_UPDATE, "ACCOUNTING", "Update draft sales invoices"),
+    (PermissionCode.SALES_POST, "ACCOUNTING", "Post sales invoices"),
+    (PermissionCode.SALES_CANCEL, "ACCOUNTING", "Cancel sales invoices"),
+    (PermissionCode.PURCHASE_VIEW, "ACCOUNTING", "View purchase invoices"),
+    (PermissionCode.PURCHASE_CREATE, "ACCOUNTING", "Create purchase invoices"),
+    (PermissionCode.PURCHASE_UPDATE, "ACCOUNTING", "Update draft purchase invoices"),
+    (PermissionCode.PURCHASE_POST, "ACCOUNTING", "Post purchase invoices"),
+    (PermissionCode.PURCHASE_CANCEL, "ACCOUNTING", "Cancel purchase invoices"),
+    (PermissionCode.PAYMENT_VIEW, "ACCOUNTING", "View payments"),
+    (PermissionCode.PAYMENT_CREATE, "ACCOUNTING", "Record payments"),
+    (PermissionCode.RECEIPT_VIEW, "ACCOUNTING", "View receipts"),
+    (PermissionCode.RECEIPT_CREATE, "ACCOUNTING", "Record receipts"),
+    (PermissionCode.JOURNAL_VIEW, "ACCOUNTING", "View journal entries"),
+    (PermissionCode.JOURNAL_CREATE, "ACCOUNTING", "Create journal entries"),
+    (PermissionCode.JOURNAL_POST, "ACCOUNTING", "Post journal entries"),
+    (PermissionCode.ACCOUNTING_IMPORT, "ACCOUNTING", "Upload and preview accounting data imports"),
+    (PermissionCode.ACCOUNTING_IMPORT_COMMIT, "ACCOUNTING", "Commit accounting data imports"),
+    (PermissionCode.ACCOUNTING_IMPORT_VIEW, "ACCOUNTING", "View import jobs and their results"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -98,6 +173,38 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.DOCUMENT_ARCHIVE,
         PermissionCode.DOCUMENT_RESTORE,
         PermissionCode.DOCUMENT_DOWNLOAD,
+        PermissionCode.ACCOUNTING_VIEW,
+        PermissionCode.ACCOUNTING_CREATE,
+        PermissionCode.ACCOUNTING_UPDATE,
+        PermissionCode.ACCOUNTING_DELETE,
+        PermissionCode.LEDGER_VIEW,
+        PermissionCode.LEDGER_MANAGE,
+        PermissionCode.CUSTOMER_VIEW,
+        PermissionCode.CUSTOMER_MANAGE,
+        PermissionCode.VENDOR_VIEW,
+        PermissionCode.VENDOR_MANAGE,
+        PermissionCode.PRODUCT_VIEW,
+        PermissionCode.PRODUCT_MANAGE,
+        PermissionCode.SALES_VIEW,
+        PermissionCode.SALES_CREATE,
+        PermissionCode.SALES_UPDATE,
+        PermissionCode.SALES_POST,
+        PermissionCode.SALES_CANCEL,
+        PermissionCode.PURCHASE_VIEW,
+        PermissionCode.PURCHASE_CREATE,
+        PermissionCode.PURCHASE_UPDATE,
+        PermissionCode.PURCHASE_POST,
+        PermissionCode.PURCHASE_CANCEL,
+        PermissionCode.PAYMENT_VIEW,
+        PermissionCode.PAYMENT_CREATE,
+        PermissionCode.RECEIPT_VIEW,
+        PermissionCode.RECEIPT_CREATE,
+        PermissionCode.JOURNAL_VIEW,
+        PermissionCode.JOURNAL_CREATE,
+        PermissionCode.JOURNAL_POST,
+        PermissionCode.ACCOUNTING_IMPORT,
+        PermissionCode.ACCOUNTING_IMPORT_COMMIT,
+        PermissionCode.ACCOUNTING_IMPORT_VIEW,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
@@ -107,6 +214,37 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.DOCUMENT_UPLOAD,
         PermissionCode.DOCUMENT_UPDATE,
         PermissionCode.DOCUMENT_DOWNLOAD,
+        PermissionCode.ACCOUNTING_VIEW,
+        PermissionCode.ACCOUNTING_CREATE,
+        PermissionCode.ACCOUNTING_UPDATE,
+        PermissionCode.LEDGER_VIEW,
+        PermissionCode.LEDGER_MANAGE,
+        PermissionCode.CUSTOMER_VIEW,
+        PermissionCode.CUSTOMER_MANAGE,
+        PermissionCode.VENDOR_VIEW,
+        PermissionCode.VENDOR_MANAGE,
+        PermissionCode.PRODUCT_VIEW,
+        PermissionCode.PRODUCT_MANAGE,
+        PermissionCode.SALES_VIEW,
+        PermissionCode.SALES_CREATE,
+        PermissionCode.SALES_UPDATE,
+        PermissionCode.SALES_POST,
+        PermissionCode.SALES_CANCEL,
+        PermissionCode.PURCHASE_VIEW,
+        PermissionCode.PURCHASE_CREATE,
+        PermissionCode.PURCHASE_UPDATE,
+        PermissionCode.PURCHASE_POST,
+        PermissionCode.PURCHASE_CANCEL,
+        PermissionCode.PAYMENT_VIEW,
+        PermissionCode.PAYMENT_CREATE,
+        PermissionCode.RECEIPT_VIEW,
+        PermissionCode.RECEIPT_CREATE,
+        PermissionCode.JOURNAL_VIEW,
+        PermissionCode.JOURNAL_CREATE,
+        PermissionCode.JOURNAL_POST,
+        PermissionCode.ACCOUNTING_IMPORT,
+        PermissionCode.ACCOUNTING_IMPORT_COMMIT,
+        PermissionCode.ACCOUNTING_IMPORT_VIEW,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
@@ -114,6 +252,17 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.AUDIT_LOG_VIEW,
         PermissionCode.DOCUMENT_VIEW,
         PermissionCode.DOCUMENT_DOWNLOAD,
+        PermissionCode.ACCOUNTING_VIEW,
+        PermissionCode.LEDGER_VIEW,
+        PermissionCode.CUSTOMER_VIEW,
+        PermissionCode.VENDOR_VIEW,
+        PermissionCode.PRODUCT_VIEW,
+        PermissionCode.SALES_VIEW,
+        PermissionCode.PURCHASE_VIEW,
+        PermissionCode.PAYMENT_VIEW,
+        PermissionCode.RECEIPT_VIEW,
+        PermissionCode.JOURNAL_VIEW,
+        PermissionCode.ACCOUNTING_IMPORT_VIEW,
     ],
 }
 

@@ -7,7 +7,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.api import auth, companies, documents, health, roles, users, audit_logs
+from app.api import (
+    accounting_periods,
+    auth,
+    companies,
+    credit_notes,
+    customers,
+    debit_notes,
+    documents,
+    financial_years,
+    health,
+    imports,
+    journal_entries,
+    ledgers,
+    opening_balances,
+    payments,
+    products,
+    purchase_invoices,
+    receipts,
+    reports,
+    roles,
+    sales_invoices,
+    users,
+    vendors,
+    audit_logs,
+)
 from app.core.config import settings
 from app.core.exceptions import AppException
 
@@ -83,3 +107,19 @@ app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(roles.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_logs.router, prefix=settings.API_V1_PREFIX)
 app.include_router(documents.router, prefix=settings.API_V1_PREFIX)
+app.include_router(financial_years.router, prefix=settings.API_V1_PREFIX)
+app.include_router(accounting_periods.router, prefix=settings.API_V1_PREFIX)
+app.include_router(ledgers.router, prefix=settings.API_V1_PREFIX)
+app.include_router(customers.router, prefix=settings.API_V1_PREFIX)
+app.include_router(vendors.router, prefix=settings.API_V1_PREFIX)
+app.include_router(products.router, prefix=settings.API_V1_PREFIX)
+app.include_router(sales_invoices.router, prefix=settings.API_V1_PREFIX)
+app.include_router(purchase_invoices.router, prefix=settings.API_V1_PREFIX)
+app.include_router(credit_notes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(debit_notes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(payments.router, prefix=settings.API_V1_PREFIX)
+app.include_router(receipts.router, prefix=settings.API_V1_PREFIX)
+app.include_router(journal_entries.router, prefix=settings.API_V1_PREFIX)
+app.include_router(opening_balances.router, prefix=settings.API_V1_PREFIX)
+app.include_router(imports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
