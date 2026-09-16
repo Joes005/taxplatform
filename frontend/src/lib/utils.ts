@@ -29,6 +29,20 @@ export function initials(firstName: string, lastName: string): string {
   return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase();
 }
 
+/** Formats a Decimal-as-string amount (every monetary API field) as
+ * Indian Rupees — never parses these through `Number` for arithmetic,
+ * only for display formatting. */
+export function formatMoney(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (Number.isNaN(num)) return "—";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(num);
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];

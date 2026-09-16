@@ -1,0 +1,5 @@
+Payment Number,Payment Date,Ledger Name,Amount,Payment Mode,Reference Number
+PAY-2026-001,01/04/2026,HDFC Bank Current Account,20000.00,BANK,NEFT12345
+PAY-2026-002,02/04/2026,Cash in Hand,3000.00,CASH,
+PAY-2026-003,03/04/2026,HDFC Bank Current Account,8000.00,UPI,UPI98765
+PAY-2026-004,04/04/2026,Nonexistent Ledger,1000.00,BANK,BADREF

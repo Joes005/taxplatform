@@ -1,0 +1,5 @@
+Invoice Number,Invoice Date,Vendor Name,Taxable Amount,CGST Amount,SGST Amount,IGST Amount,Cess Amount
+PB-2026-001,01/04/2026,Sharma Steel Suppliers,20000.00,1800.00,1800.00,0.00,0.00
+PB-2026-002,02/04/2026,National Paper Mills,8000.00,0.00,0.00,1440.00,0.00
+PB-2026-003,05-Apr-2026,Coastal Logistics,3000.00,270.00,270.00,0.00,0.00
+PB-2026-004,not-a-date,Sharma Steel Suppliers,1000.00,90.00,90.00,0.00,0.00

@@ -1,0 +1,5 @@
+Item Name,Item Code,Item Type (PRODUCT/SERVICE),HSN/SAC,Unit,Tax Rate %
+Office Chair,PRD-001,PRODUCT,9401,NOS,18
+Consulting Services,PRD-002,SERVICE,9983,HRS,18
+A4 Paper Ream,PRD-003,PRODUCT,4802,BOX,12
+Bad Item Type,PRD-004,WIDGET,4820,NOS,12

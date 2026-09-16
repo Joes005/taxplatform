@@ -1,0 +1,5 @@
+Customer Name,Customer Code,GSTIN,PAN,Email,Phone,Billing Address,State,State Code,Pincode
+Acme Traders,CUST-001,27AAAPL1234C1ZV,AAAPL1234C,acme@example.com,9876543210,"12 MG Road, Bengaluru",Karnataka,29,560001
+Beta Supplies,CUST-002,29BBBPL5678D1Z4,BBBPL5678D,beta@example.com,9876500001,"45 Anna Salai, Chennai",Tamil Nadu,33,600002
+Gamma Retail,CUST-003,,,gamma@example.com,9876500002,"7 Park Street, Kolkata",West Bengal,19,700016
+,CUST-004,24DDDPL0001E1Z2,DDDPL0001E,noname@example.com,9876500003,"Missing name row - invalid",Gujarat,24,380001

@@ -1,0 +1,5 @@
+Receipt Number,Receipt Date,Customer Name,Ledger Name,Amount,Payment Mode
+RCPT-2026-001,01/04/2026,Acme Traders,HDFC Bank Current Account,11800.00,BANK
+RCPT-2026-002,02/04/2026,Beta Supplies,Cash in Hand,5900.00,CASH
+RCPT-2026-003,03/04/2026,Gamma Retail,HDFC Bank Current Account,2950.00,UPI
+RCPT-2026-004,04/04/2026,Unknown Customer LLP,HDFC Bank Current Account,1000.00,BANK

@@ -1,0 +1,5 @@
+Invoice Number,Invoice Date,Customer Name,Taxable Amount,CGST Amount,SGST Amount,IGST Amount,Cess Amount,Place of Supply
+INV-2026-001,01/04/2026,Acme Traders,10000.00,900.00,900.00,0.00,0.00,Karnataka
+INV-2026-002,02/04/2026,Beta Supplies,5000.00,0.00,0.00,900.00,0.00,Tamil Nadu
+INV-2026-003,03-Apr-2026,Gamma Retail,2500.00,225.00,225.00,0.00,0.00,West Bengal
+INV-2026-004,04/04/2026,Unknown Customer LLP,1000.00,90.00,90.00,0.00,0.00,Delhi

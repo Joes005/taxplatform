@@ -1,0 +1,6 @@
+Ledger Name,Ledger Code,Ledger Type,Opening Balance,Opening Balance Type (DEBIT/CREDIT)
+HDFC Bank Current Account,LDG-001,BANK,150000.00,DEBIT
+Cash in Hand,LDG-002,CASH,25000.00,DEBIT
+Sales Account,LDG-003,INCOME,0.00,CREDIT
+Rent Expense,LDG-004,EXPENSE,0.00,DEBIT
+Bad Ledger Type Row,LDG-005,NOT_A_TYPE,1000.00,DEBIT

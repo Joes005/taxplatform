@@ -1,0 +1,5 @@
+Vendor Name,Vendor Code,GSTIN,PAN,Email,Phone,Address,State,State Code,Pincode
+Sharma Steel Suppliers,VEND-001,27AABCS1234D1Z1,AABCS1234D,sales@sharmasteel.example.com,9822011111,"Plot 4 MIDC, Pune",Maharashtra,27,411019
+National Paper Mills,VEND-002,09AABCN5678E1Z9,AABCN5678E,orders@natpaper.example.com,9911022222,"Sector 8, Noida",Uttar Pradesh,09,201301
+Coastal Logistics,VEND-003,,,,9944033333,"Harbour Road, Kochi",Kerala,32,682001
+Unregistered Vendor,VEND-004,NOTAVALIDGSTIN,ABCDE1234F,bad@example.com,9000000000,"Invalid GSTIN row - invalid",Delhi,07,110001
