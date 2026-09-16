@@ -6,6 +6,13 @@ from app.models.customer import Customer
 from app.models.debit_note import DebitNote, DebitNoteItem
 from app.models.document import Document, DocumentLink, DocumentStatus, DocumentType
 from app.models.financial_year import FinancialYear
+from app.models.gst_profile import GSTProfile
+from app.models.gst_reconciliation import GSTReconciliation, GSTReconciliationResult
+from app.models.gst_return_period import GSTReturnPeriod
+from app.models.gst_return_snapshot import GSTReturnSnapshot
+from app.models.gst_review_note import GSTReviewNote
+from app.models.gst_tax_rate import GSTTaxRate
+from app.models.gstr2b_record import GSTR2BRecord
 from app.models.import_job import ImportError, ImportJob, ImportRow
 from app.models.journal_entry import JournalEntry, JournalEntryLine
 from app.models.ledger import Ledger
@@ -37,6 +44,14 @@ __all__ = [
     "DocumentStatus",
     "DocumentType",
     "FinancialYear",
+    "GSTProfile",
+    "GSTReconciliation",
+    "GSTReconciliationResult",
+    "GSTReturnPeriod",
+    "GSTReturnSnapshot",
+    "GSTReviewNote",
+    "GSTTaxRate",
+    "GSTR2BRecord",
     "ImportError",
     "ImportJob",
     "ImportRow",

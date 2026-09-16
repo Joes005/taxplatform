@@ -1,0 +1,6 @@
+Customer Name,Customer Code,GSTIN,State,State Code,Email
+Bangalore Buyers Pvt Ltd,GCUST-001,29AABCB4521M1ZL,Karnataka,29,buyers@bangalorebuyers.example.com
+Mumbai Retail Traders,GCUST-002,27AABCC6612N1ZI,Maharashtra,27,retail@mumbairetail.example.com
+Walk-in Customer MH,GCUST-003,,Maharashtra,27,
+Walk-in Customer KA,GCUST-004,,Karnataka,29,
+,GCUST-005,29AABCZ0000A1Z1,Karnataka,29,noname@example.com

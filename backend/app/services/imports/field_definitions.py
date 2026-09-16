@@ -68,6 +68,7 @@ SALES_FIELDS = [
     FieldDefinition("igst_amount", "IGST Amount"),
     FieldDefinition("cess_amount", "Cess Amount"),
     FieldDefinition("place_of_supply", "Place of Supply"),
+    FieldDefinition("place_of_supply_state_code", "Place of Supply State Code"),
 ]
 
 PURCHASE_FIELDS = [
@@ -79,6 +80,8 @@ PURCHASE_FIELDS = [
     FieldDefinition("sgst_amount", "SGST Amount"),
     FieldDefinition("igst_amount", "IGST Amount"),
     FieldDefinition("cess_amount", "Cess Amount"),
+    FieldDefinition("supplier_invoice_number", "Supplier's Own Invoice Number"),
+    FieldDefinition("supplier_invoice_date", "Supplier's Own Invoice Date"),
 ]
 
 PAYMENT_FIELDS = [
@@ -97,6 +100,19 @@ RECEIPT_FIELDS = [
     FieldDefinition("ledger_name", "Ledger Name", required=True),
     FieldDefinition("amount", "Amount", required=True),
     FieldDefinition("payment_mode", "Payment Mode", required=True),
+]
+
+GSTR2B_FIELDS = [
+    FieldDefinition("supplier_gstin", "Supplier GSTIN", required=True),
+    FieldDefinition("supplier_name", "Supplier Name"),
+    FieldDefinition("invoice_number", "Invoice Number", required=True),
+    FieldDefinition("invoice_date", "Invoice Date", required=True),
+    FieldDefinition("document_type", "Document Type (INVOICE/CREDIT_NOTE/DEBIT_NOTE)"),
+    FieldDefinition("taxable_value", "Taxable Value", required=True),
+    FieldDefinition("cgst_amount", "CGST Amount"),
+    FieldDefinition("sgst_amount", "SGST Amount"),
+    FieldDefinition("igst_amount", "IGST Amount"),
+    FieldDefinition("cess_amount", "Cess Amount"),
 ]
 
 JOURNAL_FIELDS = [
@@ -118,6 +134,7 @@ FIELD_DEFINITIONS_BY_TYPE: dict[ImportType, list[FieldDefinition]] = {
     ImportType.PAYMENTS: PAYMENT_FIELDS,
     ImportType.RECEIPTS: RECEIPT_FIELDS,
     ImportType.JOURNALS: JOURNAL_FIELDS,
+    ImportType.GSTR2B: GSTR2B_FIELDS,
     # A Tally CSV/XLSX export is structurally a sales-register-style
     # export in practice; reuse the SALES mapping rather than inventing a
     # separate schema for it.

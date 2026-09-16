@@ -1,0 +1,6 @@
+Invoice Number,Invoice Date,Customer Name,Taxable Amount,CGST Amount,SGST Amount,IGST Amount,Cess Amount,Place of Supply,Place of Supply State Code
+GINV-001,01/04/2026,Bangalore Buyers Pvt Ltd,80000.00,0.00,0.00,14400.00,0.00,Karnataka,29
+GINV-002,03/04/2026,Mumbai Retail Traders,15000.00,1350.00,1350.00,0.00,0.00,Maharashtra,27
+GINV-003,05/04/2026,Walk-in Customer MH,3000.00,270.00,270.00,0.00,0.00,Maharashtra,27
+GINV-004,08/04/2026,Walk-in Customer KA,300000.00,0.00,0.00,54000.00,0.00,Karnataka,29
+GINV-005,10/04/2026,Mumbai Retail Traders,5000.00,450.00,450.00,0.00,0.00,,

@@ -4,13 +4,17 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, get_request_meta, require_permission
+from app.core.dependencies import get_current_membership, get_current_user, get_request_meta, require_permission
+from app.core.exceptions import PermissionDeniedError
 from app.core.permissions import PermissionCode
 from app.models.accounting_enums import ImportType
+from app.models.membership import CompanyMembership
 from app.models.user import User
+from app.repositories.role_repository import RoleRepository
 from app.schemas.common import PaginatedData, SuccessResponse, build_pagination_meta
 from app.schemas.import_job import (
     FieldDefinitionRead,
+    ImportColumnPreview,
     ImportErrorRead,
     ImportJobCreate,
     ImportJobRead,
@@ -23,6 +27,27 @@ from app.services.imports.field_definitions import get_field_definitions
 from app.storage import StorageProvider, get_storage_provider
 
 router = APIRouter(prefix="/accounting/imports", tags=["accounting-imports"])
+
+
+async def _ensure_permission(
+    db: AsyncSession,
+    current_user: User,
+    membership: CompanyMembership | None,
+    code: PermissionCode,
+) -> None:
+    """The generic import endpoints below gate on ACCOUNTING_IMPORT* for
+    every import_type. GSTR-2B additionally requires the GST-specific
+    permission (PHASE4 section 59) — checked here, after the request body
+    (for create) or the fetched job (for commit) reveals the import_type,
+    rather than duplicating this whole router per GST import type."""
+    if current_user.is_platform_super_admin:
+        return
+    assert membership is not None
+    codes = await RoleRepository(db).get_permission_codes_for_role(membership.role_id)
+    if code.value not in codes:
+        raise PermissionDeniedError(
+            f"You do not have permission to perform this action ({code.value})"
+        )
 
 
 @router.get("/fields", response_model=SuccessResponse[list[FieldDefinitionRead]])
@@ -38,6 +63,28 @@ async def get_import_fields(
     )
 
 
+@router.get("/preview-columns", response_model=SuccessResponse[ImportColumnPreview])
+async def preview_import_columns(
+    company_id: uuid.UUID,
+    document_id: uuid.UUID,
+    import_type: ImportType,
+    db: AsyncSession = Depends(get_db),
+    storage: StorageProvider = Depends(get_storage_provider),
+    _membership=Depends(require_permission(PermissionCode.ACCOUNTING_IMPORT.value)),
+):
+    """Lets the mapping-wizard step show the file's own column headers (and
+    a few sample rows) before the user commits to a column mapping —
+    reuses the same adapters as the real parse, so what the user sees here
+    always matches what actually gets parsed on create_job.
+    """
+    document = await DocumentService(db, storage).get_document(
+        company_id=company_id, document_id=document_id
+    )
+    service = ImportService(db, storage)
+    columns, sample_rows = await service.preview_columns(document=document, import_type=import_type)
+    return SuccessResponse(data=ImportColumnPreview(columns=columns, sample_rows=sample_rows))
+
+
 @router.post("", response_model=SuccessResponse[ImportJobRead], status_code=201)
 async def create_import_job(
     company_id: uuid.UUID,
@@ -46,8 +93,12 @@ async def create_import_job(
     storage: StorageProvider = Depends(get_storage_provider),
     current_user: User = Depends(get_current_user),
     meta: RequestMeta = Depends(get_request_meta),
+    membership: CompanyMembership | None = Depends(get_current_membership),
     _membership=Depends(require_permission(PermissionCode.ACCOUNTING_IMPORT.value)),
 ):
+    if payload.import_type == ImportType.GSTR2B:
+        await _ensure_permission(db, current_user, membership, PermissionCode.GSTR2B_IMPORT)
+
     document = await DocumentService(db, storage).get_document(
         company_id=company_id, document_id=payload.document_id
     )
@@ -57,6 +108,7 @@ async def create_import_job(
         document=document,
         import_type=payload.import_type,
         financial_year_id=payload.financial_year_id,
+        return_period_id=payload.return_period_id,
         column_mapping=payload.column_mapping,
         current_user=current_user,
         meta=meta,
@@ -145,9 +197,14 @@ async def commit_import_job(
     storage: StorageProvider = Depends(get_storage_provider),
     current_user: User = Depends(get_current_user),
     meta: RequestMeta = Depends(get_request_meta),
+    membership: CompanyMembership | None = Depends(get_current_membership),
     _membership=Depends(require_permission(PermissionCode.ACCOUNTING_IMPORT_COMMIT.value)),
 ):
     service = ImportService(db, storage)
+    existing = await service.get(company_id, job_id)
+    if existing.import_type == ImportType.GSTR2B:
+        await _ensure_permission(db, current_user, membership, PermissionCode.GSTR2B_IMPORT)
+
     job = await service.commit(company_id, job_id, current_user, meta)
     await db.commit()
     return SuccessResponse(data=ImportJobRead.model_validate(job), message="Import committed")

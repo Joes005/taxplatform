@@ -1,13 +1,25 @@
 import { NavLink, Outlet } from "react-router-dom";
 import {
+  BarChart3,
   Building2,
+  CalendarRange,
   FileText,
+  Gauge,
   LayoutDashboard,
   LogOut,
+  Receipt,
   ScrollText,
   Settings,
+  ShieldCheck,
+  ShoppingCart,
   Users,
+  UsersRound,
   Landmark,
+  Layers,
+  Package,
+  Truck,
+  UploadCloud,
+  Wallet,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +43,24 @@ const NAV_ITEMS = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+const ACCOUNTING_NAV_ITEMS = [
+  { to: "/accounting/dashboard", label: "Dashboard", icon: Gauge },
+  { to: "/accounting/financial-years", label: "Financial Years", icon: CalendarRange },
+  { to: "/accounting/ledgers", label: "Ledgers", icon: Layers },
+  { to: "/accounting/customers", label: "Customers", icon: UsersRound },
+  { to: "/accounting/vendors", label: "Vendors", icon: Truck },
+  { to: "/accounting/products", label: "Products", icon: Package },
+  { to: "/accounting/sales-invoices", label: "Sales Invoices", icon: Receipt },
+  { to: "/accounting/purchase-invoices", label: "Purchase Invoices", icon: ShoppingCart },
+  { to: "/accounting/transactions", label: "Payments & Journals", icon: Wallet },
+  { to: "/accounting/imports", label: "Imports", icon: UploadCloud },
+  { to: "/accounting/reports", label: "Reports", icon: BarChart3 },
+];
+
+const GST_NAV_ITEMS = [
+  { to: "/gst", label: "GST", icon: ShieldCheck },
+];
+
 export function AppLayout() {
   const { user, logout } = useAuth();
 
@@ -41,8 +71,50 @@ export function AppLayout() {
           <Landmark className="h-5 w-5 text-primary" />
           <span className="text-sm font-semibold tracking-tight">TaxCompliance</span>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )
+              }
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          ))}
+
+          <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Accounting
+          </p>
+          {ACCOUNTING_NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )
+              }
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          ))}
+
+          <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            GST Compliance
+          </p>
+          {GST_NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -61,7 +133,7 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="border-t border-border p-3 text-xs text-muted-foreground">
-          Phase 1 · Foundation & RBAC
+          Phase 4 · GST Compliance Engine
         </div>
       </aside>
 

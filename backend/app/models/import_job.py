@@ -28,6 +28,9 @@ class ImportJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     financial_year_id: Mapped[str | None] = mapped_column(
         GUID(), ForeignKey("financial_years.id", ondelete="SET NULL"), nullable=True
     )
+    return_period_id: Mapped[str | None] = mapped_column(
+        GUID(), ForeignKey("gst_return_periods.id", ondelete="SET NULL"), nullable=True
+    )
     import_type: Mapped[ImportType] = mapped_column(
         Enum(ImportType, native_enum=False, length=20), nullable=False, index=True
     )

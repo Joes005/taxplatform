@@ -12,6 +12,7 @@ from app.models.accounting_enums import (
     TransactionStatus,
 )
 from app.models.customer import Customer
+from app.models.gstr2b_record import GSTR2BRecord
 from app.models.import_job import ImportError as ImportErrorModel
 from app.models.import_job import ImportJob, ImportRow
 from app.models.import_job import ImportRowStatus as RowStatus
@@ -47,6 +48,23 @@ class ImportService:
         self.audit = AuditService(db)
 
     # ------------------------------------------------------------------
+    # Column discovery — lets the mapping-wizard step show the file's own
+    # headers before the user commits to a mapping, without creating a job.
+    # ------------------------------------------------------------------
+
+    async def preview_columns(
+        self, *, document, import_type: ImportType
+    ) -> tuple[list[str], list[dict]]:
+        content = await self.storage.get(document.storage_path)
+        adapter = get_adapter(document.file_extension, is_tally=(import_type == ImportType.TALLY))
+        raw_rows = adapter.parse(content)
+        if not raw_rows:
+            raise ValidationAppError("The uploaded file has no data rows", code="EMPTY_IMPORT_FILE")
+        columns = list(raw_rows[0].keys())
+        sample = [{k: str(v) if v is not None else "" for k, v in row.items()} for row in raw_rows[:5]]
+        return columns, sample
+
+    # ------------------------------------------------------------------
     # Upload -> parse -> normalize -> validate -> stage
     # ------------------------------------------------------------------
 
@@ -57,10 +75,16 @@ class ImportService:
         document,
         import_type: ImportType,
         financial_year_id: uuid.UUID | None,
+        return_period_id: uuid.UUID | None = None,
         column_mapping: dict[str, str],
         current_user: User,
         meta: RequestMeta,
     ) -> ImportJob:
+        if import_type == ImportType.GSTR2B and return_period_id is None:
+            raise ValidationAppError(
+                "return_period_id is required for a GSTR-2B import", code="RETURN_PERIOD_REQUIRED"
+            )
+
         fields = get_field_definitions(import_type)
         validate_mapping(column_mapping, fields)
 
@@ -75,6 +99,7 @@ class ImportService:
             company_id=company_id,
             document_id=document.id,
             financial_year_id=financial_year_id,
+            return_period_id=return_period_id,
             import_type=import_type,
             status=ImportStatus.VALIDATING,
             column_mapping=column_mapping,
@@ -188,6 +213,8 @@ class ImportService:
             return ("product", normalized.get("name", "").lower())
         if import_type == ImportType.LEDGERS:
             return ("ledger", normalized.get("name", "").lower())
+        if import_type == ImportType.GSTR2B:
+            return ("gstr2b", normalized.get("supplier_gstin"), normalized.get("invoice_number"))
         return None
 
     async def _check_existing_duplicate(
@@ -278,6 +305,8 @@ class ImportService:
                 await self._commit_receipts(company_id, job, valid_rows)
             elif job.import_type == ImportType.JOURNALS:
                 await self._commit_journals(company_id, job, valid_rows)
+            elif job.import_type == ImportType.GSTR2B:
+                await self._commit_gstr2b(company_id, job, valid_rows)
         except Exception:
             await self.db.rollback()
             job.status = ImportStatus.FAILED
@@ -403,6 +432,7 @@ class ImportService:
                 invoice_number=data["invoice_number"],
                 invoice_date=_to_date(data["invoice_date"]),
                 place_of_supply=data.get("place_of_supply"),
+                place_of_supply_state_code=data.get("place_of_supply_state_code"),
                 subtotal=taxable,
                 taxable_amount=taxable,
                 cgst_amount=cgst,
@@ -437,6 +467,8 @@ class ImportService:
                 vendor_id=uuid.UUID(data["vendor_id"]),
                 invoice_number=data["invoice_number"],
                 invoice_date=_to_date(data["invoice_date"]),
+                supplier_invoice_number=data.get("supplier_invoice_number"),
+                supplier_invoice_date=_to_date(data["supplier_invoice_date"]) if data.get("supplier_invoice_date") else None,
                 subtotal=taxable,
                 taxable_amount=taxable,
                 cgst_amount=cgst,
@@ -540,6 +572,40 @@ class ImportService:
             for r in group_rows:
                 r.status = RowStatus.COMMITTED
                 r.created_record_id = str(entry.id)
+
+
+    async def _commit_gstr2b(
+        self, company_id: uuid.UUID, job: ImportJob, rows: list[ImportRow]
+    ) -> None:
+        for row in rows:
+            data = row.normalized_data
+            record = GSTR2BRecord(
+                company_id=company_id,
+                return_period_id=job.return_period_id,
+                import_job_id=job.id,
+                supplier_gstin=data["supplier_gstin"],
+                supplier_name=data.get("supplier_name"),
+                invoice_number=data["invoice_number"],
+                invoice_date=_to_date(data["invoice_date"]),
+                document_type=data["document_type"],
+                taxable_value=round_money(_dec(data["taxable_value"])),
+                cgst_amount=round_money(_dec(data["cgst_amount"])),
+                sgst_amount=round_money(_dec(data["sgst_amount"])),
+                igst_amount=round_money(_dec(data["igst_amount"])),
+                cess_amount=round_money(_dec(data["cess_amount"])),
+                total_tax=round_money(
+                    _dec(data["cgst_amount"])
+                    + _dec(data["sgst_amount"])
+                    + _dec(data["igst_amount"])
+                    + _dec(data["cess_amount"])
+                ),
+                source="IMPORT",
+                source_reference=f"import:{job.id}:row:{row.row_number}",
+            )
+            self.db.add(record)
+            await self.db.flush()
+            row.status = RowStatus.COMMITTED
+            row.created_record_id = str(record.id)
 
 
 def _dec(value) -> Decimal:

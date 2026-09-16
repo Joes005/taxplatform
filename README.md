@@ -2,20 +2,33 @@
 
 **Phase 1 — Foundation, Authentication, RBAC & Multi-Tenant Architecture**
 **Phase 2 — Document Management & Data Ingestion**
+**Phase 3 — Accounting Data Layer & Tally/Excel/CSV Import**
+**Phase 4 — GST Compliance Engine (GSTR-1, GSTR-2B Reconciliation, ITC, GSTR-3B)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
 company (tenant) management, user management, and audit logging. Phase 2 builds a complete
 local document management module on top of it — upload, validation, storage, search, secure
-download, and archival — the base that future GST, TDS, Income Tax, and reconciliation
-modules will build on.
+download, and archival. Phase 3 builds a full double-entry accounting data layer on top of
+both — financial years, ledgers, customers/vendors/products, sales & purchase invoices,
+credit/debit notes, payments, receipts, journal entries, opening balances, basic reports,
+and a guided CSV/Excel/Tally-export import wizard. Phase 4 builds a GST **preparation and
+review** engine on top of that accounting data — GSTR-1 preparation, local GSTR-2B import
+and reconciliation, an ITC review workflow, and GSTR-3B preparation — for a CA/auditor to
+review before filing elsewhere.
 
-> **Scope note:** GST, TDS, Income Tax preparation, Tally integration, OCR/AI extraction,
-> and government filing are intentionally **not implemented**. Where the platform
-> anticipates them (e.g. `companies.gstin`, the `document_links` table, the `/gst`, `/tds`
-> route namespaces), they are marked as future modules, not stubbed-in fakes. **Phase 2 has
-> no paid or cloud dependency** — documents are validated and stored entirely on the local
-> filesystem; everything runs offline via `docker compose up`.
+> **Scope note:** GST/TDS/Income Tax *filing*, live Tally API integration, OCR/AI
+> extraction, and government portal integration are intentionally **not implemented**.
+> Phase 4 specifically does **not**: log into the GST portal, fetch GSTR-2B live, file
+> GSTR-1/GSTR-3B, submit any return, or process a GST payment/challan — it prepares,
+> calculates, validates, reconciles, and exports data locally so a human files it elsewhere.
+> Where the platform anticipates a not-yet-built integration (e.g. structural-only GSTIN
+> validation, the `/tds` route namespace), it is marked as a future module, not a stubbed-in
+> fake. **No phase has a paid or cloud dependency** — documents are validated and stored
+> entirely on the local filesystem, accounting data is imported from files the user already
+> has (a Tally *export*, not a live Tally connection), and GSTR-2B is imported from a local
+> CSV/XLSX/JSON file, never fetched from the government portal; everything runs offline via
+> `docker compose up`.
 
 ---
 
@@ -52,6 +65,56 @@ Core Phase 2 capabilities:
   records (invoices, bank transactions, GST returns) without those tables existing yet
 - A React documents page with drag-and-drop upload, native PDF/image preview, and full
   audit-activity visibility per document
+
+Core Phase 3 capabilities:
+
+- A full double-entry accounting foundation: financial years, accounting periods,
+  a hierarchical ledger (chart of accounts), customers, vendors, products/services, sales
+  invoices, purchase invoices, credit notes, debit notes, payments, receipts, journal
+  entries, and opening balances — money always stored as `Decimal`/`NUMERIC(18,2)`, never
+  `float`
+- Centralized GST-aware tax/total calculation (`AccountingCalculationService`) shared by
+  every transaction type, so the rounding rule and CGST/SGST/IGST split logic exist in
+  exactly one place
+- A `DRAFT → POSTED → CANCELLED` posting lifecycle with server-enforced immutability once
+  an invoice is posted
+- A CSV/Excel/Tally-export import pipeline (`AccountingImportAdapter`) with column mapping,
+  normalization, duplicate detection, a preview-before-commit step, and per-row error
+  reporting — plus full source traceability (`source`, `source_reference`, `import_job_id`)
+  on every imported record
+- Basic reports: sales/purchase summary, customer/vendor outstanding, ledger trial balance
+- A React accounting dashboard, master-data pages, invoice forms with live tax preview, and
+  a guided multi-step import wizard
+
+Core Phase 4 capabilities:
+
+- A GST profile per company with **local, structural GSTIN validation** — full 15-character
+  format, state-code lookup, and a real mod-36 checksum recomputation, never a call to any
+  government service
+- Configurable GST tax rates (platform-wide defaults plus company-specific ones) and a
+  centralized `GSTCalculationService` (CGST/SGST vs IGST split, cess) so GSTR-1, GSTR-3B,
+  and reconciliation all read the same arithmetic instead of each computing tax independently
+- Monthly **GST return periods**, a versioned generate → submit-for-review → approve →
+  finalize workflow (`GSTReturnSnapshot`), and full tenant isolation on every entity
+- **GSTR-1 preparation**: B2B, B2C (large inter-state invoices listed individually, the rest
+  aggregated by state + rate), credit/debit notes, HSN/SAC summary, document summary, and
+  structured validation findings — every row traceable back to its source `SalesInvoice`
+- **GSTR-2B import** reusing Phase 3's import pipeline unchanged (new `GSTR2B` import type,
+  plus a new JSON adapter) — from a locally uploaded CSV/XLSX/JSON file only
+- **Reconciliation** of purchase books against imported GSTR-2B in stages — exact match,
+  normalized-invoice-number match, then a cross-GSTIN check purely to explain a mismatch —
+  producing one of ten specific statuses (`MATCHED`, `AMOUNT_MISMATCH`, `BOOKS_ONLY`,
+  `GSTR2B_ONLY`, `DUPLICATE`, ...), never a single generic "mismatch"
+- **ITC review**: matched/unmatched/potential/review-required categorization with an
+  explicit reviewed → accepted/rejected workflow — only an *approved* ITC figure ever
+  reduces GSTR-3B's net liability
+- **GSTR-3B preparation**: outward supplies (netted against credit/debit notes), approved
+  vs. review-required ITC, and net tax liability by CGST/SGST/IGST/cess
+- Local CSV/XLSX export of every report, always labeled "Preparation" or "Reconciliation
+  Report," never "Filed Return"
+- A full GST React UI: dashboard, return-period detail page with GSTR-1/GSTR-2B/
+  Reconciliation/ITC/GSTR-3B tabs, all wired through the same RBAC/permission-gating
+  conventions as Phases 1–3
 
 ---
 
@@ -163,23 +226,34 @@ tax-compliance-platform/
 │   │   ├── schemas/                Pydantic request/response schemas
 │   │   ├── api/                    route handlers (thin — validation + service calls)
 │   │   ├── services/                business logic + audit logging
+│   │   │   └── imports/            CSV/Excel/Tally/JSON import adapters, normalizers, validators
 │   │   ├── repositories/           all DB queries, tenant-scoped
 │   │   ├── storage/                 StorageProvider abstraction (base.py) + LocalStorageProvider
-│   │   ├── utils/                  GUID type, password validators, file-signature validation
-│   │   └── seed.py                 idempotent roles/permissions/super-admin seed
+│   │   ├── utils/                  GUID type, password validators, file-signature validation,
+│   │   │                           GSTIN structural + checksum validation (`utils/gstin.py`),
+│   │   │                           invoice-number normalization
+│   │   └── seed.py                 idempotent roles/permissions/super-admin/GST-rates seed
 │   ├── alembic/                    migrations
 │   ├── storage/                    local document storage root (git-ignored, created at runtime)
-│   ├── tests/                      pytest suite (auth, RBAC, multi-tenancy, companies, documents)
+│   ├── tests/                      pytest suite (auth, RBAC, multi-tenancy, companies,
+│   │                               documents, accounting, imports, GST foundation, GSTR-1,
+│   │                               GSTR-2B import, reconciliation, ITC, GSTR-3B, return
+│   │                               workflow, exports, sample data)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
 │   │   ├── components/             shared UI (shadcn-style primitives in components/ui)
 │   │   ├── layouts/                AppLayout (sidebar+topbar), AuthLayout
-│   │   ├── pages/                  auth, dashboard, companies, users, documents, audit-logs, settings, errors
+│   │   ├── pages/                  auth, dashboard, companies, users, documents, audit-logs,
+│   │   │                           settings, errors, accounting (ledgers, invoices, imports,
+│   │   │                           reports, accounting dashboard), gst (dashboard, return
+│   │   │                           period detail with GSTR-1/GSTR-2B/Reconciliation/ITC/
+│   │   │                           GSTR-3B tabs)
 │   │   ├── services/                thin fetch wrappers per resource
-│   │   ├── hooks/                   useAuth, useToast, TanStack Query hooks
-│   │   ├── types/                   API response types
+│   │   ├── hooks/                   useAuth, useToast, TanStack Query hooks (hierarchical
+│   │   │                           query keys — see §20)
+│   │   ├── types/                   API response types (api.ts + accounting.ts + gst.ts)
 │   │   ├── lib/                     api-client (fetch + refresh + upload/downloadBlob), token/session storage, utils
 │   │   └── router/                  route table + ProtectedRoute
 │   └── Dockerfile
@@ -254,7 +328,7 @@ npm run dev
 | `SEED_SUPER_ADMIN_EMAIL` / `_PASSWORD` / `_FIRST_NAME` / `_LAST_NAME` | Bootstrap super admin, development only |
 | `DOCUMENT_STORAGE_PATH` | Root directory for local document storage (default `./storage`) |
 | `MAX_UPLOAD_SIZE_MB` | Per-file upload size cap (default 10) |
-| `ALLOWED_DOCUMENT_EXTENSIONS` | Comma-separated whitelist (default `pdf,jpg,jpeg,png,xlsx,xls,csv`) — this can only *narrow* the set of types the backend knows how to signature-check (`app/utils/file_validation.py`), never expand beyond it |
+| `ALLOWED_DOCUMENT_EXTENSIONS` | Comma-separated whitelist (default `pdf,jpg,jpeg,png,xlsx,xls,csv,json` — `json` added in Phase 4 for GSTR-2B uploads) — this can only *narrow* the set of types the backend knows how to signature-check (`app/utils/file_validation.py`), never expand beyond it |
 
 **`frontend/.env`**
 
@@ -288,6 +362,16 @@ future-linking table (indexed on `document_id` and on `(company_id, resource_typ
 resource_id)` for reverse lookups once a future module needs them). Neither migration
 alters a Phase 1 table.
 
+Phase 4 adds two migrations: one creating `gst_profiles`, `gst_tax_rates`,
+`gst_return_periods`, `gst_return_snapshots`, `gstr2b_records`, `gst_reconciliations`,
+`gst_reconciliation_results`, and `gst_review_notes` (all `company_id`-indexed, plus
+composite indexes for the lookups reconciliation and GSTR-1 actually run — e.g.
+`(company_id, return_period_id, supplier_gstin, invoice_number)` on `gstr2b_records`); a
+second adds a nullable `return_period_id` to the existing Phase 3 `import_jobs` table (the
+same generalization `financial_year_id` already represents for accounting imports — "the
+period this import belongs to"). No Phase 1–3 table is altered beyond that one additive
+column.
+
 ## 9. Seed Data
 
 ```bash
@@ -301,6 +385,8 @@ Idempotent — safe to run repeatedly. Seeds:
   permissions from Phase 2) and role→permission mappings
 - One bootstrap platform super admin, from `SEED_SUPER_ADMIN_*` env vars — never
   hardcoded, and the password must be changed before any real deployment
+- The five standard platform-wide GST tax rate slabs (0/5/12/18/28%, `company_id=NULL`) —
+  Phase 4's `seed_gst_default_tax_rates`; a company can still add its own rates on top
 
 `DOCUMENT_DELETE` and `DOCUMENT_MANAGE` are deliberately not granted to any seeded
 company-level role — only a platform super admin (via the `is_platform_super_admin`
@@ -355,6 +441,46 @@ Coverage includes:
   DB error never leaks to the client
 - **Audit logging (Phase 2):** upload, download, archive, restore, and duplicate-attempt
   are all logged and tenant-isolated
+- **Accounting (Phase 3):** master data CRUD; tax/total calculation against hand-computed
+  expected values; the `INVALID_TAX_SPLIT` and `UNBALANCED_JOURNAL` rejections; the
+  `DRAFT → POSTED → CANCELLED` posting lifecycle and its immutability guard; duplicate
+  invoice detection scoped to `(company, number, date, party)`; financial-year/period date
+  guards; cross-tenant isolation; RBAC on every accounting permission; audit logging
+- **Imports (Phase 3):** upload/parse producing correct row counts; missing-field,
+  incomplete-mapping, invalid-date, and missing-customer row errors; commit creating only
+  the rows still valid at commit time; rejection of a second commit on an already-committed
+  job; cancel preventing a later commit; cross-tenant import isolation; RBAC on commit
+- **GST foundation (Phase 4):** GSTIN structural + checksum validation (valid/invalid
+  format, unknown state code, wrong checksum) against known real GSTIN examples; tax
+  calculation at 5/12/18/28% for both intra- and inter-state, plus cess; place-of-supply
+  intra/inter-state determination; transaction classification (B2B/B2C/review-required);
+  tenant isolation and RBAC on the profile/tax-rate/return-period endpoints
+- **GSTR-1:** B2B classification, B2C aggregation by state+rate, B2C-large vs. B2C-others
+  split at the ₹2.5L inter-state threshold, missing-place-of-supply → `REVIEW_REQUIRED`
+  and a `MISSING_PLACE_OF_SUPPLY` validation finding, cancelled invoices excluded from
+  totals but counted in the document summary, HSN summary aggregation and missing-HSN
+  flagging, the `GST_PROFILE_REQUIRED` guard, cross-tenant isolation
+- **GSTR-2B import:** JSON/CSV/XLSX parsing through the extended Phase 3 pipeline,
+  invalid-GSTIN and duplicate-row handling, the `RETURN_PERIOD_REQUIRED` guard, RBAC
+- **Reconciliation & ITC:** exact match, amount mismatch, books-only, GSTR-2B-only,
+  re-running replacing prior results, the full review → accept/reject workflow and its
+  effect on the ITC summary
+- **GSTR-3B:** outward supplies before any reconciliation has run, and net liability
+  correctly dropping only after an ITC result is explicitly approved
+- **Return workflow:** the full `generate → submit-for-review → approve → finalize`
+  transition sequence, per-return-type snapshot versioning, the "finalized is immutable"
+  guard, the return period's own status only reaching `FINALIZED` once *both* GSTR-1 and
+  GSTR-3B are finalized, and RBAC (an Accountant can generate/submit but not
+  approve/finalize)
+- **Exports:** CSV and XLSX generation for GSTR-1/GSTR-3B/reconciliation/ITC, with the
+  reconciliation/ITC exports correctly requiring a reconciliation run first
+- **Sample data (Phase 4):** the shipped `samples/sample_gst_*` and `samples/sample_gstr2b.*`
+  files are imported through the real pipeline and asserted to produce the exact matched/
+  mismatch/books-only/GSTR-2B-only/review-required outcomes documented in
+  `samples/README.md`, so the sample data can never silently drift from the code
+
+As of Phase 4, the full suite is **173 tests**, all passing against a real PostgreSQL
+database.
 
 ## 13. API Documentation
 
@@ -370,6 +496,24 @@ GET    /api/v1/documents/{document_id}/download?company_id=... streamed file
 PATCH  /api/v1/documents/{document_id}?company_id=...           update type/description
 PATCH  /api/v1/documents/{document_id}/archive?company_id=...
 PATCH  /api/v1/documents/{document_id}/restore?company_id=...
+```
+
+...and the Phase 4 GST endpoints:
+
+```
+POST   /api/v1/gst/profile?company_id=...                                    create GST profile
+GET    /api/v1/gst/tax-rates?company_id=...
+POST   /api/v1/gst/return-periods?company_id=...
+GET    /api/v1/gst/return-periods/{period_id}/gstr1?company_id=...           overview
+GET    /api/v1/gst/return-periods/{period_id}/gstr1/{b2b|b2c-large|b2c-others|credit-notes|debit-notes|hsn|documents|validation}
+POST   /api/v1/accounting/imports?company_id=...                             import_type=GSTR2B, reused from Phase 3
+GET    /api/v1/gst/gstr2b?company_id=...&return_period_id=...                imported records
+POST   /api/v1/gst/return-periods/{period_id}/reconciliation?company_id=...  run reconciliation
+GET    /api/v1/gst/return-periods/{period_id}/itc/summary?company_id=...
+POST   /api/v1/gst/return-periods/{period_id}/itc/{result_id}/{review|approve}?company_id=...
+GET    /api/v1/gst/return-periods/{period_id}/gstr3b?company_id=...
+POST   /api/v1/gst/return-periods/{period_id}/{generate|submit-for-review|approve|finalize}?company_id=...
+GET    /api/v1/gst/return-periods/{period_id}/reports/{gstr1|gstr3b|reconciliation|itc}?company_id=...&format=csv|xlsx
 ```
 
 ---
@@ -457,20 +601,169 @@ documents (an archived original no longer blocks re-upload of the same content) 
 remain downloadable to authorized users — documents are compliance evidence, and Phase 2
 never destroys them.
 
-## 18. Future Module Roadmap
+## 18. Accounting & Import Explanation (Phase 3)
+
+Phase 3 adds a full double-entry accounting data layer — financial years, a hierarchical
+chart of accounts (ledgers), customers/vendors/products, sales & purchase invoices, credit
+& debit notes, payments, receipts, journal entries, opening balances — plus a
+CSV/Excel/Tally import pipeline, all reusing Phase 1's RBAC and Phase 2's document storage
+without modifying either.
+
+**Money is `Decimal`/`NUMERIC(18,2)` everywhere, never `float`.** `app/models/mixins.py`
+defines shared `MONEY`, `RATE`, and `QUANTITY` `Numeric` column types, and every tax/total
+calculation runs through one shared module, `AccountingCalculationService`
+(`app/services/accounting_calculation_service.py`), so the rounding rule
+(`ROUND_HALF_UP`, to 2 decimal places) is applied identically for sales invoices, purchase
+invoices, and credit/debit notes — there is exactly one place in the codebase that computes
+tax and totals.
+
+**GST math without GST filing.** A line item may carry CGST+SGST *or* IGST, never both
+(`INVALID_TAX_SPLIT` if both are set) — this mirrors how intra-state vs inter-state supply
+works in Indian GST, but Phase 3 only *computes and stores* these amounts on documents; it
+never generates a GSTR return or talks to a government API. GSTIN fields are validated only
+**structurally** (`app/utils/gst_validators.py`: a regex shape check plus a state-code
+lookup table) — never against a live government registry.
+
+**Posting lifecycle: `DRAFT → POSTED → CANCELLED`.** Sales and purchase invoices are
+mutable while `DRAFT` and become server-enforced immutable once `POSTED`
+(`POSTED_TRANSACTION_IMMUTABLE` on any edit attempt); `CANCELLED` is terminal. This
+mirrors how a real accountant works — an invoice can be corrected freely up until it's
+"finalized," after which correcting it means issuing a credit/debit note, not silently
+editing history.
+
+**Duplicate detection is scoped to `(company_id, invoice_number, date, party)`, not
+`invoice_number` alone** — two different customers, or the same customer on two different
+dates, can legitimately reuse an invoice number sequence (e.g. after a books reset), so a
+bare number match would produce false positives. Cancelled invoices are excluded from the
+duplicate check so a corrected re-entry isn't blocked by its own cancelled predecessor.
+
+**The import pipeline** (`app/services/import_service.py` and `app/services/imports/`)
+follows one path regardless of source format:
+
+```
+Upload file (Phase 2's document endpoint)
+   → Create Import Job (choose type + column mapping)
+   → Parse (CSVImportAdapter / ExcelImportAdapter / TallyExportAdapter)
+   → Normalize (dates, amounts, header variants)
+   → Validate each row (per-ImportType validators, using a preloaded
+     ImportContext so name→id lookups aren't N+1 queries)
+   → Detect duplicates (in-batch and against existing DB records)
+   → Preview (row-by-row VALID / ERROR / DUPLICATE status + error detail)
+   → User reviews and confirms
+   → Commit (creates real records; only rows still VALID at commit time
+     are created — a job can only be committed once, from READY)
+   → Summary (counts recomputed from final row statuses)
+```
+
+A source file's column headers **never** need to match the system's field names — the
+column-mapping step (`app/services/imports/column_mapping.py`) lets the user map
+`"Cust Name"` → `name`, `"Inv#"` → `invoice_number`, etc. Every imported record carries
+`source` (`"IMPORT"` vs `"MANUAL"`), `source_reference`, and `import_job_id`, so it's always
+possible to trace a ledger entry back to the exact file and job that created it. A "Tally
+export" is handled by `TallyExportAdapter`, which delegates to the CSV or Excel adapter by
+file extension — Phase 3 reads Tally's *exported* CSV/XLSX files, never Tally's live API.
+
+The frontend wizard (`frontend/src/pages/accounting/ImportWizardPage.tsx`) walks the same
+three stages — upload & pick type, map columns (backed by a `GET
+/accounting/imports/preview-columns` endpoint that parses the file and returns just its
+headers and a few sample rows, without creating a job, so the user can map columns *before*
+committing to anything), then preview & commit.
+
+## 19. GST Compliance Explanation (Phase 4)
+
+Phase 4 is a **preparation, validation, reconciliation, and export** layer on top of
+Phase 3's accounting data — it never files anything and never talks to the GST portal.
+Every service that reads sales/purchase data does so read-only; nothing in this phase
+mutates a `SalesInvoice`, `PurchaseInvoice`, `CreditNote`, or `DebitNote`.
+
+```
+Accounting Data (Phase 3)
+   → GST Classification (B2B/B2C/REVIEW_REQUIRED — never guessed)
+   → GST Calculation (one shared CGST/SGST/IGST/cess engine)
+   → GSTR-1 Preparation
+   → GSTR-2B Import (local file only)
+   → Reconciliation (staged matching)
+   → ITC Review (reviewed → accepted/rejected)
+   → GSTR-3B Preparation
+   → Return Workflow (generate → submit-for-review → approve → finalize, versioned)
+   → Export (CSV/XLSX, clearly labeled "Preparation")
+```
+
+**GSTIN validation is entirely local.** `app/utils/gstin.py` checks the 15-character
+structure, looks the state-code prefix up in a static table (`app/core/gst_state_codes.py`),
+and recomputes the check digit with the published mod-36, alternating-factor algorithm —
+verified in tests against two publicly documented real GSTINs. A structurally valid GSTIN
+is never presented as "verified" or "active"; that would require a government API this
+platform does not call.
+
+**"Don't guess" is the load-bearing rule of the whole classification layer.**
+`GSTTransactionClassificationService` returns `B2B` only when the customer has a
+structurally valid GSTIN, `B2C` only when the customer has neither a GSTIN nor a missing
+state code, and `REVIEW_REQUIRED` for everything else — including the case Phase 3's
+`Customer`/`SalesInvoice` models simply cannot answer yet (no export/SEZ indicator exists),
+which is why `GSTR1Service.get_exports` always returns an empty list rather than a guess.
+The same principle drives `GSTValidationService`: every finding carries a `severity`
+(`INFO`/`WARNING`/`ERROR`) and points at the exact source record, so a CA reviews specific,
+traceable issues instead of a vague "something's wrong."
+
+**GSTR-1's B2C split follows the actual legal rule, not an approximation.** An inter-state
+B2C invoice over ₹2,50,000 is listed individually (`GSTR1B2CLargeRow`); everything else is
+aggregated by place-of-supply state code + tax rate at the *line-item* level
+(`GSTR1B2COthersRow`), because a single invoice can legitimately mix tax rates across its
+items.
+
+**Reconciliation matches in stages, and only ever narrows a mismatch — it never hides
+one.** `GSTReconciliationService.run()` tries an exact match (supplier GSTIN + invoice
+number + date) first, then a normalized-invoice-number match (`INV-001` ≡ `INV001` ≡
+`inv 001`, via `app/utils/invoice_number.py`) within the same GSTIN, and only then a
+same-invoice-number-different-GSTIN check purely to produce a specific `GSTIN_MISMATCH`
+finding rather than a silent `BOOKS_ONLY`. Amount comparison uses a small, explicit rupee
+tolerance (`AMOUNT_TOLERANCE`), never a "looks close enough" heuristic. Re-running a
+period's reconciliation deletes and replaces its prior result rows — the reconciliation
+*run* history (counts, match %) is kept, but individual stale result rows never linger
+mixed in with fresh ones.
+
+**ITC only reduces GSTR-3B's liability once a human has said so.** Every reconciliation
+result also carries an `itc_category` (derived mechanically from its match status) and an
+`itc_review_status` that starts `PENDING` and can only move to `REVIEWED`, `ACCEPTED`, or
+`REJECTED` through an explicit API call with its own permission
+(`ITC_REVIEW` vs. the stronger `ITC_APPROVE`) and audit log entry.
+`GSTR3BService.generate()` sums only `ACCEPTED` amounts into `eligible_itc` — a `MATCHED`
+but not-yet-reviewed result contributes to `itc_matched` for visibility, never to the net
+liability figure.
+
+**Finalizing is real, and it's genuinely one-way.** A `GSTReturnSnapshot` moves
+`DRAFT → UNDER_REVIEW → APPROVED → FINALIZED` (or `UNDER_REVIEW → CHANGES_REQUESTED`, a
+dead end for that version); the finalized `_TRANSITIONS` state machine in
+`gst_return_snapshot_service.py` has no entry starting from `FINALIZED`, so no code path can
+transition it further. If the underlying accounting data changes afterward, the fix is a
+new `generate()` call, which creates version 2 rather than mutating version 1 — the return
+period's own `GSTReturnPeriodStatus` only reaches `FINALIZED` once *both* its GSTR-1 and
+GSTR-3B snapshots are finalized, so a period stays visibly `UNDER_REVIEW` until it truly is.
+
+**GSTR-2B import reuses Phase 3's pipeline, not a parallel one.** Adding it was: one new
+`ImportType.GSTR2B` member, one new `JSONImportAdapter` (CSV/XLSX already worked via the
+existing adapters), one `validate_gstr2b_row` function, and one `_commit_gstr2b` branch —
+in the same files Phase 3 already dispatches every other import type from. The only schema
+change was a nullable `return_period_id` on `ImportJob`, mirroring how `financial_year_id`
+already works for accounting imports. No new upload/preview/commit endpoints were needed;
+the existing generic `/accounting/imports/*` routes already parametrize on `import_type`.
+
+## 20. Future Module Roadmap
 
 These remain route-namespace placeholders only, ready for a future module to fill in
-without touching Phase 1 or Phase 2 (`/gst`, `/tds`, `/income-tax`, `/reconciliation`,
-`/bank`, `/audit`, `/compliance`, `/reports`, `/tally`, `/integrations`):
+without touching Phases 1–4 (`/tds`, `/income-tax`, `/bank`,
+`/audit`, `/compliance`, `/tally`, `/integrations`):
 
 | Phase | Module |
 |---|---|
 | 1 | Foundation, auth, RBAC, multi-tenancy, audit logging *(done)* |
 | 2 | Document management & local data ingestion *(done)* |
-| 3 | GST Compliance (GSTR-1, GSTR-3B, GSTR-2B reconciliation) |
-| 4 | TDS Compliance |
-| 5 | Bank Reconciliation |
-| — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), CA/Auditor review workflows, Compliance calendar, Tax/audit reports, Tally import, government portal integrations |
+| 3 | Accounting data layer & Tally/Excel/CSV import *(done)* |
+| 4 | GST Compliance — GSTR-1, GSTR-2B reconciliation, ITC, GSTR-3B *(done — no portal filing)* |
+| 5 | TDS Compliance |
+| 6 | Bank Reconciliation |
+| — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter` for an eventual real filing integration, Compliance calendar, live Tally API integration |
 
 Each future module is expected to live in its own `models/ schemas/ services/
 repositories/ api/` subtree (per `app/core/permissions.py`'s module grouping), reusing —
@@ -481,7 +774,7 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
 
 ---
 
-## 19. Key Architectural Decisions
+## 21. Key Architectural Decisions
 
 - **Modular monolith, not microservices.** One deployable backend, cleanly layered, so
   future modules are new packages inside `app/`, not new services to operate.
@@ -519,10 +812,43 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
   plain URL has no way to carry; the blob is fetched via `apiClient.downloadBlob()` and
   either saved (`triggerBlobDownload`) or turned into an object URL for the native
   PDF/image preview.
+- **One shared `AccountingCalculationService`, not per-endpoint tax math** (Phase 3) — sales
+  invoices, purchase invoices, and credit/debit notes all compute taxable amounts, GST
+  splits, and grand totals through the same `calculate_line_item`/`calculate_document`
+  methods, so a rounding-rule change or bug fix applies everywhere at once instead of
+  needing to be found and fixed in four separate services.
+- **Duplicate detection keys on `(company_id, invoice_number, date, party)`, not
+  `invoice_number` alone** (Phase 3) — matches how invoice numbering actually works in
+  practice (numbers can legitimately repeat across customers or after a books reset), and
+  cancelled invoices are excluded so a corrected re-entry isn't blocked by its own
+  cancelled predecessor.
+- **Imported records carry full source traceability** (Phase 3) — every row created via
+  import stores `source="IMPORT"`, `source_reference`, and `import_job_id`, so any ledger
+  entry can always be traced back to the exact file and job that created it, without a
+  separate audit table.
+- **GST-specific entities are new flat models, never duplicates of Phase 3 data** (Phase 4)
+  — `GSTProfile`, `GSTTaxRate`, `GSTReturnPeriod`, `GSTReturnSnapshot`, `GSTR2BRecord`,
+  `GSTReconciliation`/`Result` exist because the GST domain genuinely needs independent
+  records (a GSTR-2B row has no Phase 3 equivalent at all); everything else — customers,
+  vendors, sales/purchase invoices — is read directly from Phase 3's existing tables.
+- **One `GSTCalculationService`, reusing Phase 3's own `round_money`** (Phase 4) — rather
+  than a second, similar-but-not-identical rounding rule, the GST engine imports the exact
+  same paise-rounding function `AccountingCalculationService` already uses, so a rupee
+  never rounds differently depending on which module touched it last.
+- **Classification defaults to `REVIEW_REQUIRED`, never a best guess** (Phase 4) — GST
+  compliance carries real legal and financial consequences, so every place the engine lacks
+  enough data to classify a transaction confidently (missing place of supply, an
+  unrecognized customer GSTIN, an export with no indicator field to read) it says so
+  explicitly instead of silently picking the most likely answer.
+- **A versioned `GSTReturnSnapshot`, not live-recomputed "current" data, backs the review
+  workflow** (Phase 4) — accounting data is mutable and a GST return preparation must not
+  be. Generating a return snapshots the numbers at that moment; approving/finalizing acts
+  on that frozen version, and a later accounting correction produces version 2 rather than
+  silently changing what a reviewer already approved.
 
 ---
 
-## 20. Security Notes
+## 22. Security Notes
 
 - Passwords are hashed with **Argon2id** (`argon2-cffi`), never stored or logged in
   plaintext.

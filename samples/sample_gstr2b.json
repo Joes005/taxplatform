@@ -1,0 +1,50 @@
+[
+  {
+    "Supplier GSTIN": "27AABCS7452Q1ZO",
+    "Supplier Name": "Steelcore Industries",
+    "Invoice No": "STL-9001",
+    "Invoice Date": "2026-04-03",
+    "Doc Type": "INVOICE",
+    "Taxable Value": "50000.00",
+    "CGST": "4500.00",
+    "SGST": "4500.00",
+    "IGST": "0.00",
+    "Cess": "0.00"
+  },
+  {
+    "Supplier GSTIN": "09AABCN8834R1ZL",
+    "Supplier Name": "Northern Paper Co",
+    "Invoice No": "NPC-2201",
+    "Invoice Date": "2026-04-05",
+    "Doc Type": "INVOICE",
+    "Taxable Value": "20000.00",
+    "CGST": "0.00",
+    "SGST": "0.00",
+    "IGST": "3400.00",
+    "Cess": "0.00"
+  },
+  {
+    "Supplier GSTIN": "29AABCE9123T1ZW",
+    "Supplier Name": "Bangalore Electricals",
+    "Invoice No": "BLR-999",
+    "Invoice Date": "2026-04-12",
+    "Doc Type": "INVOICE",
+    "Taxable Value": "7000.00",
+    "CGST": "0.00",
+    "SGST": "0.00",
+    "IGST": "1260.00",
+    "Cess": "0.00"
+  },
+  {
+    "Supplier GSTIN": "NOTAVALIDGSTIN",
+    "Supplier Name": "Unknown Supplier",
+    "Invoice No": "BAD-001",
+    "Invoice Date": "2026-04-13",
+    "Doc Type": "INVOICE",
+    "Taxable Value": "1000.00",
+    "CGST": "90.00",
+    "SGST": "90.00",
+    "IGST": "0.00",
+    "Cess": "0.00"
+  }
+]

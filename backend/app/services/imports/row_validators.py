@@ -260,6 +260,7 @@ def validate_sales_row(row: dict, ctx: ImportContext) -> RowResult:
         "igst_amount": igst,
         "cess_amount": cess,
         "place_of_supply": normalize_text(row.get("place_of_supply")),
+        "place_of_supply_state_code": normalize_text(row.get("place_of_supply_state_code")),
     }
     return result
 
@@ -301,6 +302,13 @@ def validate_purchase_row(row: dict, ctx: ImportContext) -> RowResult:
         result.errors.append(RowError(None, "INVALID_AMOUNT", str(exc)))
         cgst = sgst = igst = cess = Decimal("0")
 
+    supplier_invoice_date = None
+    if row.get("supplier_invoice_date"):
+        try:
+            supplier_invoice_date = normalize_date(row.get("supplier_invoice_date"))
+        except NormalizationError as exc:
+            result.errors.append(RowError("supplier_invoice_date", "INVALID_DATE", str(exc)))
+
     if result.errors:
         return result
 
@@ -313,6 +321,8 @@ def validate_purchase_row(row: dict, ctx: ImportContext) -> RowResult:
         "sgst_amount": sgst,
         "igst_amount": igst,
         "cess_amount": cess,
+        "supplier_invoice_number": normalize_text(row.get("supplier_invoice_number")),
+        "supplier_invoice_date": supplier_invoice_date,
     }
     return result
 
@@ -457,6 +467,82 @@ def validate_journal_row(row: dict, ctx: ImportContext) -> RowResult:
     return result
 
 
+def validate_gstr2b_row(row: dict, ctx: ImportContext) -> RowResult:
+    from app.utils.gstin import is_valid_gstin
+
+    result = RowResult()
+
+    supplier_gstin = _require(row, "supplier_gstin")
+    if not supplier_gstin:
+        result.errors.append(
+            RowError("supplier_gstin", "MISSING_GSTIN", "Supplier GSTIN is required")
+        )
+    elif not is_valid_gstin(supplier_gstin.upper()):
+        result.errors.append(
+            RowError(
+                "supplier_gstin",
+                "INVALID_GSTIN_FORMAT",
+                f"'{supplier_gstin}' is not a structurally valid GSTIN",
+            )
+        )
+
+    invoice_number = _require(row, "invoice_number")
+    if not invoice_number:
+        result.errors.append(
+            RowError("invoice_number", "MISSING_INVOICE_NUMBER", "Invoice number is required")
+        )
+
+    try:
+        invoice_date = normalize_date(row.get("invoice_date"))
+    except NormalizationError as exc:
+        result.errors.append(RowError("invoice_date", "INVALID_DATE", str(exc)))
+        invoice_date = None
+
+    document_type = (_require(row, "document_type") or "INVOICE").upper()
+    if document_type not in ("INVOICE", "CREDIT_NOTE", "DEBIT_NOTE"):
+        result.errors.append(
+            RowError(
+                "document_type",
+                "INVALID_DOCUMENT_TYPE",
+                f"'{document_type}' must be INVOICE, CREDIT_NOTE, or DEBIT_NOTE",
+            )
+        )
+
+    try:
+        taxable_value = normalize_amount(row.get("taxable_value"))
+        if taxable_value < 0:
+            raise NormalizationError("Taxable value cannot be negative")
+    except NormalizationError as exc:
+        result.errors.append(RowError("taxable_value", "INVALID_AMOUNT", str(exc)))
+        taxable_value = None
+
+    try:
+        cgst = normalize_optional_amount(row.get("cgst_amount"))
+        sgst = normalize_optional_amount(row.get("sgst_amount"))
+        igst = normalize_optional_amount(row.get("igst_amount"))
+        cess = normalize_optional_amount(row.get("cess_amount"))
+    except NormalizationError as exc:
+        result.errors.append(RowError(None, "INVALID_AMOUNT", str(exc)))
+        cgst = sgst = igst = cess = Decimal("0")
+
+    if result.errors:
+        return result
+
+    result.normalized = {
+        "supplier_gstin": supplier_gstin.upper(),
+        "supplier_name": normalize_text(row.get("supplier_name")),
+        "invoice_number": invoice_number,
+        "invoice_date": invoice_date,
+        "document_type": document_type,
+        "taxable_value": taxable_value,
+        "cgst_amount": cgst,
+        "sgst_amount": sgst,
+        "igst_amount": igst,
+        "cess_amount": cess,
+    }
+    return result
+
+
 VALIDATORS = {
     ImportType.CUSTOMERS: validate_customer_row,
     ImportType.VENDORS: validate_vendor_row,
@@ -468,6 +554,7 @@ VALIDATORS = {
     ImportType.RECEIPTS: validate_receipt_row,
     ImportType.JOURNALS: validate_journal_row,
     ImportType.TALLY: validate_sales_row,
+    ImportType.GSTR2B: validate_gstr2b_row,
 }
 
 

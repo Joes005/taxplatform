@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # touching the document service, API, or database model.
     DOCUMENT_STORAGE_PATH: str = "./storage"
     MAX_UPLOAD_SIZE_MB: int = 10
-    ALLOWED_DOCUMENT_EXTENSIONS: str = "pdf,jpg,jpeg,png,xlsx,xls,csv"
+    ALLOWED_DOCUMENT_EXTENSIONS: str = "pdf,jpg,jpeg,png,xlsx,xls,csv,json"
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -9,6 +9,7 @@ class here, not touching the import pipeline.
 
 import csv
 import io
+import json
 from abc import ABC, abstractmethod
 
 from openpyxl import load_workbook
@@ -58,6 +59,35 @@ class ExcelImportAdapter(AccountingImportAdapter):
         return rows
 
 
+class JSONImportAdapter(AccountingImportAdapter):
+    """Parses a flat JSON array of objects — e.g. `[{"supplier_gstin": ...,
+    "invoice_number": ...}, ...]`. This is deliberately not the GST
+    portal's deeply-nested GSTR-2B download schema (grouped by supplier,
+    by document type, ...): without a real reference file to test against,
+    claiming to parse that nested format would be exactly the kind of
+    unverified support PHASE4 section 26 says to avoid. A GSTR-2B export
+    already flattened to one row per document (as this platform's own
+    sample files are) parses correctly; a raw portal JSON download does
+    not yet.
+    """
+
+    def parse(self, content: bytes) -> list[dict[str, str]]:
+        try:
+            data = json.loads(content.decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValidationAppError("Could not parse this JSON file", code="INVALID_FILE") from exc
+
+        if isinstance(data, dict):
+            data = data.get("records") or data.get("data") or data.get("rows")
+
+        if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
+            raise ValidationAppError(
+                "JSON import expects a flat array of row objects (or {\"records\": [...]})",
+                code="INVALID_FILE",
+            )
+        return data
+
+
 class TallyExportAdapter(AccountingImportAdapter):
     """Tally's "Export -> CSV/Excel" produces an ordinary CSV or XLSX file
     — there is no live Tally API involved (explicitly out of scope). This
@@ -80,6 +110,8 @@ def get_adapter(file_extension: str, *, is_tally: bool = False) -> AccountingImp
         return ExcelImportAdapter()
     if file_extension == "csv":
         return CSVImportAdapter()
+    if file_extension == "json":
+        return JSONImportAdapter()
     raise ValidationAppError(
         f"Unsupported import file type: .{file_extension}", code="DOCUMENT_TYPE_NOT_SUPPORTED"
     )

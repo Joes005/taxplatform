@@ -1,0 +1,5 @@
+Invoice Number,Invoice Date,Vendor Name,Taxable Amount,CGST Amount,SGST Amount,IGST Amount,Cess Amount,Supplier Invoice Number,Supplier Invoice Date
+GPB-001,03/04/2026,Steelcore Industries,50000.00,4500.00,4500.00,0.00,0.00,STL-9001,03/04/2026
+GPB-002,05/04/2026,Northern Paper Co,20000.00,0.00,0.00,3600.00,0.00,NPC-2201,05/04/2026
+GPB-003,08/04/2026,Bangalore Electricals,12000.00,0.00,0.00,2160.00,0.00,BLR-771,08/04/2026
+GPB-004,not-a-date,Steelcore Industries,1000.00,90.00,90.00,0.00,0.00,STL-9002,09/04/2026

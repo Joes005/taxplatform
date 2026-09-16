@@ -152,7 +152,7 @@ export const DOCUMENT_STATUSES = [
 ] as const;
 export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
 
-export const SUPPORTED_UPLOAD_EXTENSIONS = ["pdf", "jpg", "jpeg", "png", "xlsx", "xls", "csv"];
+export const SUPPORTED_UPLOAD_EXTENSIONS = ["pdf", "jpg", "jpeg", "png", "xlsx", "xls", "csv", "json"];
 
 export interface DocumentUploaderSummary {
   id: string;

@@ -109,6 +109,7 @@ class ImportType(StrEnum):
     LEDGERS = "LEDGERS"
     JOURNALS = "JOURNALS"
     TALLY = "TALLY"
+    GSTR2B = "GSTR2B"
 
 
 class ImportStatus(StrEnum):

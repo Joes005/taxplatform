@@ -16,8 +16,18 @@ from app.api import (
     debit_notes,
     documents,
     financial_years,
+    gst_profile,
+    gst_reconciliation,
+    gst_reports,
+    gst_return_periods,
+    gst_return_snapshots,
+    gst_tax_rates,
+    gstr1,
+    gstr2b,
+    gstr3b,
     health,
     imports,
+    itc,
     journal_entries,
     ledgers,
     opening_balances,
@@ -123,3 +133,13 @@ app.include_router(journal_entries.router, prefix=settings.API_V1_PREFIX)
 app.include_router(opening_balances.router, prefix=settings.API_V1_PREFIX)
 app.include_router(imports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gst_profile.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gst_tax_rates.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gst_return_periods.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gst_return_snapshots.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gst_reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gstr1.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gstr2b.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gst_reconciliation.router, prefix=settings.API_V1_PREFIX)
+app.include_router(itc.router, prefix=settings.API_V1_PREFIX)
+app.include_router(gstr3b.router, prefix=settings.API_V1_PREFIX)

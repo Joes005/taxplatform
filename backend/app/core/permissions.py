@@ -82,6 +82,33 @@ class PermissionCode(StrEnum):
     ACCOUNTING_IMPORT_COMMIT = "ACCOUNTING_IMPORT_COMMIT"
     ACCOUNTING_IMPORT_VIEW = "ACCOUNTING_IMPORT_VIEW"
 
+    # --- GST (Phase 4) ---
+    GST_VIEW = "GST_VIEW"
+    GST_CREATE = "GST_CREATE"
+    GST_UPDATE = "GST_UPDATE"
+
+    GST_RETURN_VIEW = "GST_RETURN_VIEW"
+    GST_RETURN_GENERATE = "GST_RETURN_GENERATE"
+    GST_RETURN_VALIDATE = "GST_RETURN_VALIDATE"
+    GST_RETURN_APPROVE = "GST_RETURN_APPROVE"
+    GST_RETURN_FINALIZE = "GST_RETURN_FINALIZE"
+
+    GSTR1_VIEW = "GSTR1_VIEW"
+    GSTR1_GENERATE = "GSTR1_GENERATE"
+    GSTR1_EXPORT = "GSTR1_EXPORT"
+
+    GSTR2B_IMPORT = "GSTR2B_IMPORT"
+    GSTR2B_VIEW = "GSTR2B_VIEW"
+    GSTR2B_RECONCILE = "GSTR2B_RECONCILE"
+
+    ITC_VIEW = "ITC_VIEW"
+    ITC_REVIEW = "ITC_REVIEW"
+    ITC_APPROVE = "ITC_APPROVE"
+
+    GSTR3B_VIEW = "GSTR3B_VIEW"
+    GSTR3B_GENERATE = "GSTR3B_GENERATE"
+    GSTR3B_EXPORT = "GSTR3B_EXPORT"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -146,6 +173,26 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.ACCOUNTING_IMPORT, "ACCOUNTING", "Upload and preview accounting data imports"),
     (PermissionCode.ACCOUNTING_IMPORT_COMMIT, "ACCOUNTING", "Commit accounting data imports"),
     (PermissionCode.ACCOUNTING_IMPORT_VIEW, "ACCOUNTING", "View import jobs and their results"),
+    (PermissionCode.GST_VIEW, "GST", "View GST profile and tax configuration"),
+    (PermissionCode.GST_CREATE, "GST", "Create GST profile and tax configuration"),
+    (PermissionCode.GST_UPDATE, "GST", "Update GST profile and tax configuration"),
+    (PermissionCode.GST_RETURN_VIEW, "GST", "View GST return periods"),
+    (PermissionCode.GST_RETURN_GENERATE, "GST", "Generate GST return preparation data"),
+    (PermissionCode.GST_RETURN_VALIDATE, "GST", "Validate GST return preparation data"),
+    (PermissionCode.GST_RETURN_APPROVE, "GST", "Approve a GST return preparation"),
+    (PermissionCode.GST_RETURN_FINALIZE, "GST", "Finalize a GST return preparation"),
+    (PermissionCode.GSTR1_VIEW, "GST", "View GSTR-1 preparation data"),
+    (PermissionCode.GSTR1_GENERATE, "GST", "Generate GSTR-1 preparation data"),
+    (PermissionCode.GSTR1_EXPORT, "GST", "Export GSTR-1 preparation reports"),
+    (PermissionCode.GSTR2B_IMPORT, "GST", "Import GSTR-2B statements"),
+    (PermissionCode.GSTR2B_VIEW, "GST", "View imported GSTR-2B records"),
+    (PermissionCode.GSTR2B_RECONCILE, "GST", "Run purchase-vs-GSTR-2B reconciliation"),
+    (PermissionCode.ITC_VIEW, "GST", "View Input Tax Credit analysis"),
+    (PermissionCode.ITC_REVIEW, "GST", "Mark ITC reconciliation results as reviewed"),
+    (PermissionCode.ITC_APPROVE, "GST", "Approve or reject ITC reconciliation results"),
+    (PermissionCode.GSTR3B_VIEW, "GST", "View GSTR-3B preparation data"),
+    (PermissionCode.GSTR3B_GENERATE, "GST", "Generate GSTR-3B preparation data"),
+    (PermissionCode.GSTR3B_EXPORT, "GST", "Export GSTR-3B preparation reports"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -205,6 +252,26 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.ACCOUNTING_IMPORT,
         PermissionCode.ACCOUNTING_IMPORT_COMMIT,
         PermissionCode.ACCOUNTING_IMPORT_VIEW,
+        PermissionCode.GST_VIEW,
+        PermissionCode.GST_CREATE,
+        PermissionCode.GST_UPDATE,
+        PermissionCode.GST_RETURN_VIEW,
+        PermissionCode.GST_RETURN_GENERATE,
+        PermissionCode.GST_RETURN_VALIDATE,
+        PermissionCode.GST_RETURN_APPROVE,
+        PermissionCode.GST_RETURN_FINALIZE,
+        PermissionCode.GSTR1_VIEW,
+        PermissionCode.GSTR1_GENERATE,
+        PermissionCode.GSTR1_EXPORT,
+        PermissionCode.GSTR2B_IMPORT,
+        PermissionCode.GSTR2B_VIEW,
+        PermissionCode.GSTR2B_RECONCILE,
+        PermissionCode.ITC_VIEW,
+        PermissionCode.ITC_REVIEW,
+        PermissionCode.ITC_APPROVE,
+        PermissionCode.GSTR3B_VIEW,
+        PermissionCode.GSTR3B_GENERATE,
+        PermissionCode.GSTR3B_EXPORT,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
@@ -245,6 +312,23 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.ACCOUNTING_IMPORT,
         PermissionCode.ACCOUNTING_IMPORT_COMMIT,
         PermissionCode.ACCOUNTING_IMPORT_VIEW,
+        PermissionCode.GST_VIEW,
+        PermissionCode.GST_CREATE,
+        PermissionCode.GST_UPDATE,
+        PermissionCode.GST_RETURN_VIEW,
+        PermissionCode.GST_RETURN_GENERATE,
+        PermissionCode.GST_RETURN_VALIDATE,
+        PermissionCode.GSTR1_VIEW,
+        PermissionCode.GSTR1_GENERATE,
+        PermissionCode.GSTR1_EXPORT,
+        PermissionCode.GSTR2B_IMPORT,
+        PermissionCode.GSTR2B_VIEW,
+        PermissionCode.GSTR2B_RECONCILE,
+        PermissionCode.ITC_VIEW,
+        PermissionCode.ITC_REVIEW,
+        PermissionCode.GSTR3B_VIEW,
+        PermissionCode.GSTR3B_GENERATE,
+        PermissionCode.GSTR3B_EXPORT,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
@@ -263,6 +347,14 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.RECEIPT_VIEW,
         PermissionCode.JOURNAL_VIEW,
         PermissionCode.ACCOUNTING_IMPORT_VIEW,
+        PermissionCode.GST_VIEW,
+        PermissionCode.GST_RETURN_VIEW,
+        PermissionCode.GST_RETURN_APPROVE,
+        PermissionCode.GSTR1_VIEW,
+        PermissionCode.GSTR2B_VIEW,
+        PermissionCode.ITC_VIEW,
+        PermissionCode.ITC_APPROVE,
+        PermissionCode.GSTR3B_VIEW,
     ],
 }
 
