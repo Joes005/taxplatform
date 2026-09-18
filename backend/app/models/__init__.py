@@ -4,6 +4,7 @@ from app.models.company import Company
 from app.models.credit_note import CreditNote, CreditNoteItem
 from app.models.customer import Customer
 from app.models.debit_note import DebitNote, DebitNoteItem
+from app.models.deductee import Deductee
 from app.models.document import Document, DocumentLink, DocumentStatus, DocumentType
 from app.models.financial_year import FinancialYear
 from app.models.gst_profile import GSTProfile
@@ -26,6 +27,15 @@ from app.models.receipt import Receipt
 from app.models.refresh_token import RefreshToken
 from app.models.role import Role
 from app.models.sales_invoice import SalesInvoice, SalesInvoiceItem
+from app.models.tds_challan import TDSChallan, TDSChallanAllocation
+from app.models.tds_profile import TDSProfile
+from app.models.tds_reconciliation import TDSPaymentReconciliation
+from app.models.tds_return_period import TDSReturnPeriod
+from app.models.tds_return_snapshot import TDSReturnSnapshot
+from app.models.tds_review_note import TDSReviewNote
+from app.models.tds_rule import TDSRule
+from app.models.tds_section import TDSSection
+from app.models.tds_transaction import TDSTransaction
 from app.models.user import User
 from app.models.vendor import Vendor
 
@@ -39,6 +49,7 @@ __all__ = [
     "CompanyMembership",
     "DebitNote",
     "DebitNoteItem",
+    "Deductee",
     "Document",
     "DocumentLink",
     "DocumentStatus",
@@ -71,6 +82,16 @@ __all__ = [
     "Role",
     "SalesInvoice",
     "SalesInvoiceItem",
+    "TDSChallan",
+    "TDSChallanAllocation",
+    "TDSPaymentReconciliation",
+    "TDSProfile",
+    "TDSReturnPeriod",
+    "TDSReturnSnapshot",
+    "TDSReviewNote",
+    "TDSRule",
+    "TDSSection",
+    "TDSTransaction",
     "User",
     "Vendor",
 ]

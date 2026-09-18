@@ -37,6 +37,12 @@ import AccountingDashboardPage from "@/pages/accounting/AccountingDashboardPage"
 import GstDashboardPage from "@/pages/gst/GstDashboardPage";
 import GstReturnPeriodDetailPage from "@/pages/gst/GstReturnPeriodDetailPage";
 
+import TdsDashboardPage from "@/pages/tds/TdsDashboardPage";
+import DeducteesPage from "@/pages/tds/DeducteesPage";
+import TdsTransactionsPage from "@/pages/tds/TdsTransactionsPage";
+import TdsChallansPage from "@/pages/tds/TdsChallansPage";
+import TdsReturnPeriodDetailPage from "@/pages/tds/TdsReturnPeriodDetailPage";
+
 export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
@@ -77,6 +83,11 @@ export const router = createBrowserRouter([
           { path: "/accounting/dashboard", element: <AccountingDashboardPage /> },
           { path: "/gst", element: <GstDashboardPage /> },
           { path: "/gst/return-periods/:periodId", element: <GstReturnPeriodDetailPage /> },
+          { path: "/tds", element: <TdsDashboardPage /> },
+          { path: "/tds/deductees", element: <DeducteesPage /> },
+          { path: "/tds/transactions", element: <TdsTransactionsPage /> },
+          { path: "/tds/challans", element: <TdsChallansPage /> },
+          { path: "/tds/return-periods/:periodId", element: <TdsReturnPeriodDetailPage /> },
         ],
       },
     ],

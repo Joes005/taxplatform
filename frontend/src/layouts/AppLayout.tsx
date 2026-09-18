@@ -20,6 +20,7 @@ import {
   Truck,
   UploadCloud,
   Wallet,
+  UserRound,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -59,6 +60,13 @@ const ACCOUNTING_NAV_ITEMS = [
 
 const GST_NAV_ITEMS = [
   { to: "/gst", label: "GST", icon: ShieldCheck },
+];
+
+const TDS_NAV_ITEMS = [
+  { to: "/tds", label: "Dashboard", icon: Landmark },
+  { to: "/tds/deductees", label: "Deductees", icon: UserRound },
+  { to: "/tds/transactions", label: "Transactions", icon: Receipt },
+  { to: "/tds/challans", label: "Challans", icon: Wallet },
 ];
 
 export function AppLayout() {
@@ -131,9 +139,30 @@ export function AppLayout() {
               {item.label}
             </NavLink>
           ))}
+
+          <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            TDS Compliance
+          </p>
+          {TDS_NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )
+              }
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         <div className="border-t border-border p-3 text-xs text-muted-foreground">
-          Phase 4 · GST Compliance Engine
+          Phase 5 · TDS Compliance Engine
         </div>
       </aside>
 

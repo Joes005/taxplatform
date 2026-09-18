@@ -109,6 +109,40 @@ class PermissionCode(StrEnum):
     GSTR3B_GENERATE = "GSTR3B_GENERATE"
     GSTR3B_EXPORT = "GSTR3B_EXPORT"
 
+    # --- TDS (Phase 5) ---
+    TDS_VIEW = "TDS_VIEW"
+    TDS_CREATE = "TDS_CREATE"
+    TDS_UPDATE = "TDS_UPDATE"
+
+    TDS_DEDUCTEE_VIEW = "TDS_DEDUCTEE_VIEW"
+    TDS_DEDUCTEE_MANAGE = "TDS_DEDUCTEE_MANAGE"
+
+    TDS_RULE_VIEW = "TDS_RULE_VIEW"
+    TDS_RULE_MANAGE = "TDS_RULE_MANAGE"
+
+    TDS_TRANSACTION_VIEW = "TDS_TRANSACTION_VIEW"
+    TDS_TRANSACTION_CREATE = "TDS_TRANSACTION_CREATE"
+    TDS_TRANSACTION_UPDATE = "TDS_TRANSACTION_UPDATE"
+    TDS_TRANSACTION_CALCULATE = "TDS_TRANSACTION_CALCULATE"
+    TDS_TRANSACTION_CANCEL = "TDS_TRANSACTION_CANCEL"
+
+    TDS_CHALLAN_VIEW = "TDS_CHALLAN_VIEW"
+    TDS_CHALLAN_CREATE = "TDS_CHALLAN_CREATE"
+    TDS_CHALLAN_UPDATE = "TDS_CHALLAN_UPDATE"
+    TDS_CHALLAN_RECONCILE = "TDS_CHALLAN_RECONCILE"
+
+    TDS_RETURN_VIEW = "TDS_RETURN_VIEW"
+    TDS_RETURN_GENERATE = "TDS_RETURN_GENERATE"
+    TDS_RETURN_VALIDATE = "TDS_RETURN_VALIDATE"
+    TDS_RETURN_APPROVE = "TDS_RETURN_APPROVE"
+    TDS_RETURN_FINALIZE = "TDS_RETURN_FINALIZE"
+
+    TDS_IMPORT = "TDS_IMPORT"
+    TDS_IMPORT_COMMIT = "TDS_IMPORT_COMMIT"
+
+    TDS_REPORT_VIEW = "TDS_REPORT_VIEW"
+    TDS_REPORT_EXPORT = "TDS_REPORT_EXPORT"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -193,6 +227,31 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.GSTR3B_VIEW, "GST", "View GSTR-3B preparation data"),
     (PermissionCode.GSTR3B_GENERATE, "GST", "Generate GSTR-3B preparation data"),
     (PermissionCode.GSTR3B_EXPORT, "GST", "Export GSTR-3B preparation reports"),
+    (PermissionCode.TDS_VIEW, "TDS", "View TDS profile and configuration"),
+    (PermissionCode.TDS_CREATE, "TDS", "Create TDS profile and configuration"),
+    (PermissionCode.TDS_UPDATE, "TDS", "Update TDS profile and configuration"),
+    (PermissionCode.TDS_DEDUCTEE_VIEW, "TDS", "View deductees"),
+    (PermissionCode.TDS_DEDUCTEE_MANAGE, "TDS", "Create and update deductees"),
+    (PermissionCode.TDS_RULE_VIEW, "TDS", "View TDS sections and rules"),
+    (PermissionCode.TDS_RULE_MANAGE, "TDS", "Create and update TDS rules"),
+    (PermissionCode.TDS_TRANSACTION_VIEW, "TDS", "View TDS transactions"),
+    (PermissionCode.TDS_TRANSACTION_CREATE, "TDS", "Create TDS transactions"),
+    (PermissionCode.TDS_TRANSACTION_UPDATE, "TDS", "Update draft TDS transactions"),
+    (PermissionCode.TDS_TRANSACTION_CALCULATE, "TDS", "Run TDS applicability/calculation"),
+    (PermissionCode.TDS_TRANSACTION_CANCEL, "TDS", "Cancel a TDS transaction"),
+    (PermissionCode.TDS_CHALLAN_VIEW, "TDS", "View TDS challans"),
+    (PermissionCode.TDS_CHALLAN_CREATE, "TDS", "Create TDS challans"),
+    (PermissionCode.TDS_CHALLAN_UPDATE, "TDS", "Update/allocate TDS challans"),
+    (PermissionCode.TDS_CHALLAN_RECONCILE, "TDS", "Run TDS payment reconciliation"),
+    (PermissionCode.TDS_RETURN_VIEW, "TDS", "View TDS return periods"),
+    (PermissionCode.TDS_RETURN_GENERATE, "TDS", "Generate TDS return preparation data"),
+    (PermissionCode.TDS_RETURN_VALIDATE, "TDS", "Validate TDS return preparation data"),
+    (PermissionCode.TDS_RETURN_APPROVE, "TDS", "Approve a TDS return preparation"),
+    (PermissionCode.TDS_RETURN_FINALIZE, "TDS", "Finalize a TDS return preparation"),
+    (PermissionCode.TDS_IMPORT, "TDS", "Upload and preview TDS data imports"),
+    (PermissionCode.TDS_IMPORT_COMMIT, "TDS", "Commit TDS data imports"),
+    (PermissionCode.TDS_REPORT_VIEW, "TDS", "View TDS reports"),
+    (PermissionCode.TDS_REPORT_EXPORT, "TDS", "Export TDS preparation/reconciliation reports"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -272,6 +331,31 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.GSTR3B_VIEW,
         PermissionCode.GSTR3B_GENERATE,
         PermissionCode.GSTR3B_EXPORT,
+        PermissionCode.TDS_VIEW,
+        PermissionCode.TDS_CREATE,
+        PermissionCode.TDS_UPDATE,
+        PermissionCode.TDS_DEDUCTEE_VIEW,
+        PermissionCode.TDS_DEDUCTEE_MANAGE,
+        PermissionCode.TDS_RULE_VIEW,
+        PermissionCode.TDS_RULE_MANAGE,
+        PermissionCode.TDS_TRANSACTION_VIEW,
+        PermissionCode.TDS_TRANSACTION_CREATE,
+        PermissionCode.TDS_TRANSACTION_UPDATE,
+        PermissionCode.TDS_TRANSACTION_CALCULATE,
+        PermissionCode.TDS_TRANSACTION_CANCEL,
+        PermissionCode.TDS_CHALLAN_VIEW,
+        PermissionCode.TDS_CHALLAN_CREATE,
+        PermissionCode.TDS_CHALLAN_UPDATE,
+        PermissionCode.TDS_CHALLAN_RECONCILE,
+        PermissionCode.TDS_RETURN_VIEW,
+        PermissionCode.TDS_RETURN_GENERATE,
+        PermissionCode.TDS_RETURN_VALIDATE,
+        PermissionCode.TDS_RETURN_APPROVE,
+        PermissionCode.TDS_RETURN_FINALIZE,
+        PermissionCode.TDS_IMPORT,
+        PermissionCode.TDS_IMPORT_COMMIT,
+        PermissionCode.TDS_REPORT_VIEW,
+        PermissionCode.TDS_REPORT_EXPORT,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
@@ -329,6 +413,28 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.GSTR3B_VIEW,
         PermissionCode.GSTR3B_GENERATE,
         PermissionCode.GSTR3B_EXPORT,
+        PermissionCode.TDS_VIEW,
+        PermissionCode.TDS_CREATE,
+        PermissionCode.TDS_UPDATE,
+        PermissionCode.TDS_DEDUCTEE_VIEW,
+        PermissionCode.TDS_DEDUCTEE_MANAGE,
+        PermissionCode.TDS_RULE_VIEW,
+        PermissionCode.TDS_TRANSACTION_VIEW,
+        PermissionCode.TDS_TRANSACTION_CREATE,
+        PermissionCode.TDS_TRANSACTION_UPDATE,
+        PermissionCode.TDS_TRANSACTION_CALCULATE,
+        PermissionCode.TDS_TRANSACTION_CANCEL,
+        PermissionCode.TDS_CHALLAN_VIEW,
+        PermissionCode.TDS_CHALLAN_CREATE,
+        PermissionCode.TDS_CHALLAN_UPDATE,
+        PermissionCode.TDS_CHALLAN_RECONCILE,
+        PermissionCode.TDS_RETURN_VIEW,
+        PermissionCode.TDS_RETURN_GENERATE,
+        PermissionCode.TDS_RETURN_VALIDATE,
+        PermissionCode.TDS_IMPORT,
+        PermissionCode.TDS_IMPORT_COMMIT,
+        PermissionCode.TDS_REPORT_VIEW,
+        PermissionCode.TDS_REPORT_EXPORT,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
@@ -355,6 +461,15 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.ITC_VIEW,
         PermissionCode.ITC_APPROVE,
         PermissionCode.GSTR3B_VIEW,
+        PermissionCode.TDS_VIEW,
+        PermissionCode.TDS_DEDUCTEE_VIEW,
+        PermissionCode.TDS_RULE_VIEW,
+        PermissionCode.TDS_TRANSACTION_VIEW,
+        PermissionCode.TDS_CHALLAN_VIEW,
+        PermissionCode.TDS_RETURN_VIEW,
+        PermissionCode.TDS_RETURN_APPROVE,
+        PermissionCode.TDS_RETURN_FINALIZE,
+        PermissionCode.TDS_REPORT_VIEW,
     ],
 }
 

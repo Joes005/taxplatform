@@ -4,6 +4,7 @@
 **Phase 2 — Document Management & Data Ingestion**
 **Phase 3 — Accounting Data Layer & Tally/Excel/CSV Import**
 **Phase 4 — GST Compliance Engine (GSTR-1, GSTR-2B Reconciliation, ITC, GSTR-3B)**
+**Phase 5 — TDS Compliance Engine (Deductees, Rule Engine, Challans, Reconciliation, Returns)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -14,20 +15,26 @@ both — financial years, ledgers, customers/vendors/products, sales & purchase 
 credit/debit notes, payments, receipts, journal entries, opening balances, basic reports,
 and a guided CSV/Excel/Tally-export import wizard. Phase 4 builds a GST **preparation and
 review** engine on top of that accounting data — GSTR-1 preparation, local GSTR-2B import
-and reconciliation, an ITC review workflow, and GSTR-3B preparation — for a CA/auditor to
-review before filing elsewhere.
+and reconciliation, an ITC review workflow, and GSTR-3B preparation. Phase 5 builds a TDS
+**preparation and review** engine alongside it — deductee management, a configurable/
+effective-dated rule engine that decides applicability and calculates deductions (never
+silently), the deduction lifecycle through to challan tracking and payment reconciliation,
+and quarterly TDS return preparation — all for a CA/auditor to review before filing
+elsewhere.
 
 > **Scope note:** GST/TDS/Income Tax *filing*, live Tally API integration, OCR/AI
 > extraction, and government portal integration are intentionally **not implemented**.
 > Phase 4 specifically does **not**: log into the GST portal, fetch GSTR-2B live, file
-> GSTR-1/GSTR-3B, submit any return, or process a GST payment/challan — it prepares,
-> calculates, validates, reconciles, and exports data locally so a human files it elsewhere.
-> Where the platform anticipates a not-yet-built integration (e.g. structural-only GSTIN
-> validation, the `/tds` route namespace), it is marked as a future module, not a stubbed-in
-> fake. **No phase has a paid or cloud dependency** — documents are validated and stored
-> entirely on the local filesystem, accounting data is imported from files the user already
-> has (a Tally *export*, not a live Tally connection), and GSTR-2B is imported from a local
-> CSV/XLSX/JSON file, never fetched from the government portal; everything runs offline via
+> GSTR-1/GSTR-3B, submit any return, or process a GST payment/challan. Phase 5 specifically
+> does **not**: log into the TRACES/Income Tax e-filing portal, verify a PAN/TAN against any
+> government service, file 24Q/26Q/27Q/27EQ, or pay a TDS challan — both only prepare,
+> calculate, validate, reconcile, and export data locally so a human files it elsewhere.
+> Where the platform anticipates a not-yet-built integration (e.g. structural-only PAN/TAN
+> validation), it is marked as a future module, not a stubbed-in fake. **No phase has a paid
+> or cloud dependency** — documents are validated and stored entirely on the local
+> filesystem, accounting data is imported from files the user already has (a Tally *export*,
+> not a live Tally connection), and GSTR-2B/TDS reconciliation data are imported from local
+> CSV/XLSX/JSON files, never fetched from any government portal; everything runs offline via
 > `docker compose up`.
 
 ---
@@ -115,6 +122,35 @@ Core Phase 4 capabilities:
 - A full GST React UI: dashboard, return-period detail page with GSTR-1/GSTR-2B/
   Reconciliation/ITC/GSTR-3B tabs, all wired through the same RBAC/permission-gating
   conventions as Phases 1–3
+
+Core Phase 5 capabilities:
+
+- A TDS profile per company with **local, structural TAN/PAN validation** (format only — TAN
+  has no publicly documented checksum, so none is invented) and a deductee register
+  optionally linked to an existing Phase 3 Vendor/Customer rather than duplicating it
+- A **rule engine** (`TDSRuleEngine` = `TDSApplicabilityService` + `TDSCalculationService`)
+  over effective-dated, company-overridable `TDSRule`s (mirroring `GSTTaxRate`): every
+  evaluation resolves to `APPLICABLE`, `NOT_APPLICABLE`, `REVIEW_REQUIRED`, or
+  `MISSING_DATA` with a stated reason — a missing rule, missing PAN with no configured
+  no-PAN rate, or an unresolvable aggregate threshold is **never guessed**, only flagged
+- **TDS transactions** with a server-enforced `DRAFT → CALCULATED → DEDUCTED → PAID` (and
+  `→ CANCELLED`) lifecycle; a manual override preserves the original `system_calculated_amount`
+  alongside the overridden `tds_amount` so an auditor can always see what changed and why
+- **TDS challans** with allocation against transactions, guarded against over-allocation on
+  both the challan side and the transaction side — tracking/preparation only, this platform
+  never pays a challan
+- **Reconciliation** comparing deducted amounts against challan allocations, producing
+  `MATCHED` / `PARTIALLY_MATCHED` / `MISSING_CHALLAN` / `UNALLOCATED_PAYMENT` findings,
+  fully recomputed on every run rather than accumulating stale state
+- A CSV/Excel **reconciliation import** (new `TDS` import type on Phase 3's existing import
+  pipeline) for bringing in already-known TDS data — deductees must already exist by name,
+  never auto-created, and every row lands as a traceable `DEDUCTED` transaction
+- **Quarterly TDS return periods**, a versioned generate → submit-for-review → approve →
+  finalize workflow (`TDSReturnSnapshot`), quarterly/section/deductee/challan reports, and
+  local CSV/XLSX export always labeled "Preparation" or "Reconciliation Report"
+- A full TDS React UI: dashboard, deductees/transactions/challans pages, and a return-period
+  detail page with Overview/Sections/Deductees/Challans/Reconciliation/Review Notes tabs,
+  wired through the same RBAC/permission-gating conventions as Phases 1–4
 
 ---
 
@@ -231,14 +267,18 @@ tax-compliance-platform/
 │   │   ├── storage/                 StorageProvider abstraction (base.py) + LocalStorageProvider
 │   │   ├── utils/                  GUID type, password validators, file-signature validation,
 │   │   │                           GSTIN structural + checksum validation (`utils/gstin.py`),
+│   │   │                           PAN/TAN structural validation (`utils/pan.py`, `utils/tan.py`),
 │   │   │                           invoice-number normalization
-│   │   └── seed.py                 idempotent roles/permissions/super-admin/GST-rates seed
+│   │   └── seed.py                 idempotent roles/permissions/super-admin/GST-rates/
+│   │                               TDS-sections-and-rates seed
 │   ├── alembic/                    migrations
 │   ├── storage/                    local document storage root (git-ignored, created at runtime)
 │   ├── tests/                      pytest suite (auth, RBAC, multi-tenancy, companies,
 │   │                               documents, accounting, imports, GST foundation, GSTR-1,
 │   │                               GSTR-2B import, reconciliation, ITC, GSTR-3B, return
-│   │                               workflow, exports, sample data)
+│   │                               workflow, exports, sample data, TDS foundation, TDS
+│   │                               engine, TDS transactions, TDS challans, TDS
+│   │                               reconciliation, TDS import, TDS return workflow)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -249,11 +289,13 @@ tax-compliance-platform/
 │   │   │                           settings, errors, accounting (ledgers, invoices, imports,
 │   │   │                           reports, accounting dashboard), gst (dashboard, return
 │   │   │                           period detail with GSTR-1/GSTR-2B/Reconciliation/ITC/
-│   │   │                           GSTR-3B tabs)
+│   │   │                           GSTR-3B tabs), tds (dashboard, deductees, transactions,
+│   │   │                           challans, return period detail with Overview/Sections/
+│   │   │                           Deductees/Challans/Reconciliation/Review Notes tabs)
 │   │   ├── services/                thin fetch wrappers per resource
 │   │   ├── hooks/                   useAuth, useToast, TanStack Query hooks (hierarchical
 │   │   │                           query keys — see §20)
-│   │   ├── types/                   API response types (api.ts + accounting.ts + gst.ts)
+│   │   ├── types/                   API response types (api.ts + accounting.ts + gst.ts + tds.ts)
 │   │   ├── lib/                     api-client (fetch + refresh + upload/downloadBlob), token/session storage, utils
 │   │   └── router/                  route table + ProtectedRoute
 │   └── Dockerfile
@@ -372,6 +414,15 @@ same generalization `financial_year_id` already represents for accounting import
 period this import belongs to"). No Phase 1–3 table is altered beyond that one additive
 column.
 
+Phase 5 adds four migrations, none altering a prior table beyond the `TDS` import-type
+addition (a non-native enum stored as plain `VARCHAR`, so it needed no schema change at
+all): `tds_profiles`, `tds_sections`, `tds_rules`, and `deductees` (foundation);
+`tds_transactions`; `tds_challans` and `tds_challan_allocations`; and
+`tds_payment_reconciliations`, `tds_return_periods`, `tds_return_snapshots`, and
+`tds_review_notes` together. Composite indexes match the lookups the engine actually
+runs — e.g. `(company_id, status)` and `(company_id, transaction_date)` on
+`tds_transactions` for the payable summary and quarterly reports.
+
 ## 9. Seed Data
 
 ```bash
@@ -387,6 +438,10 @@ Idempotent — safe to run repeatedly. Seeds:
   hardcoded, and the password must be changed before any real deployment
 - The five standard platform-wide GST tax rate slabs (0/5/12/18/28%, `company_id=NULL`) —
   Phase 4's `seed_gst_default_tax_rates`; a company can still add its own rates on top
+- Five sample platform-wide TDS sections (194C, 194H, 194I, 194J, 194Q) and their standard
+  rates — Phase 5's `seed_default_tds_sections_and_rules`, explicitly documented as
+  development/testing configuration, not an authoritative statutory rate table; a company
+  can add its own section-specific override rules on top
 
 `DOCUMENT_DELETE` and `DOCUMENT_MANAGE` are deliberately not granted to any seeded
 company-level role — only a platform super admin (via the `is_platform_super_admin`
@@ -478,8 +533,47 @@ Coverage includes:
   files are imported through the real pipeline and asserted to produce the exact matched/
   mismatch/books-only/GSTR-2B-only/review-required outcomes documented in
   `samples/README.md`, so the sample data can never silently drift from the code
+- **TDS foundation (Phase 5):** PAN/TAN structural validation (valid/invalid format, missing
+  value); idempotent seeding of the five sample sections/rules; TDS profile create/get/
+  update and its `TDS_PROFILE_ALREADY_EXISTS` guard; deductee create/update with automatic
+  `pan_status` derivation; company-specific rule override creation and the
+  `TDS_RULE_READ_ONLY` guard on platform defaults; tenant isolation and RBAC throughout
+- **TDS engine:** calculation at a configured percentage rate against hand-computed expected
+  values; the missing-PAN → no-PAN-rate substitution and its `MISSING_NO_PAN_RATE` failure
+  when unconfigured; FIXED-rate clamping to the gross amount; applicability resolving to
+  `MISSING_DATA`/`NOT_APPLICABLE`/`APPLICABLE`/`REVIEW_REQUIRED` for missing deductee, below-
+  threshold, above-threshold, unresolvable aggregate threshold, invalid PAN, and no-effective-
+  rule cases respectively; the rule engine's end-to-end trace including/excluding a
+  calculation depending on applicability
+- **TDS transactions:** the full `DRAFT → CALCULATED → DEDUCTED` happy path via the API; a
+  below-threshold transaction calculating to zero TDS; a missing-PAN section with a
+  configured no-PAN rate still resolving to `APPLICABLE`; a manual override preserving
+  `system_calculated_amount` while changing `tds_amount`; the "cannot cancel a DEDUCTED
+  transaction" and "cannot deduct twice" state-machine guards; tenant isolation; RBAC (an
+  Auditor cannot create a transaction)
+- **TDS challans:** creation and allocation; over-allocation rejected on both the challan
+  side (`CHALLAN_OVER_ALLOCATION`) and the transaction side (`TRANSACTION_OVER_ALLOCATION`);
+  an allocation against a `PAID` challan marking its transaction `PAID`; the forward-only
+  status-transition guard (`DRAFT` cannot jump straight to `PAID`); tenant isolation
+- **TDS reconciliation:** a fully-allocated transaction resolving `MATCHED`; an unallocated
+  deduction resolving `MISSING_CHALLAN`; a partial allocation resolving `PARTIALLY_MATCHED`
+  on the transaction side and `UNALLOCATED_PAYMENT` on the challan side simultaneously; a
+  re-run replacing (never duplicating) prior findings
+- **TDS import:** valid CSV parsing and commit landing rows as `DEDUCTED` transactions
+  directly (reconciliation import of known data, not a calculation request);
+  `MISSING_DEDUCTEE` and `MISSING_SECTION` row errors when the referenced deductee/section
+  doesn't exist; duplicate-row detection; the `TDS_IMPORT`/`TDS_IMPORT_COMMIT` permission
+  gates layered onto the shared Phase 3 import endpoints (mirroring how Phase 4 gated
+  GSTR-2B)
+- **TDS return workflow:** quarter date-range computation from the financial year's start
+  month; the duplicate-quarter guard; the full `generate → submit-for-review → approve →
+  finalize` sequence with the return period's own status kept in sync at each step; the
+  "finalized is immutable" guard; regeneration producing a new version reflecting data
+  changed since v1; review-note creation and the "cannot resolve twice" guard; the
+  quarterly/section summary report endpoints; the `TDS_PROFILE_REQUIRED` export guard and a
+  successful CSV export
 
-As of Phase 4, the full suite is **173 tests**, all passing against a real PostgreSQL
+As of Phase 5, the full suite is **240 tests**, all passing against a real PostgreSQL
 database.
 
 ## 13. API Documentation
@@ -514,6 +608,27 @@ POST   /api/v1/gst/return-periods/{period_id}/itc/{result_id}/{review|approve}?c
 GET    /api/v1/gst/return-periods/{period_id}/gstr3b?company_id=...
 POST   /api/v1/gst/return-periods/{period_id}/{generate|submit-for-review|approve|finalize}?company_id=...
 GET    /api/v1/gst/return-periods/{period_id}/reports/{gstr1|gstr3b|reconciliation|itc}?company_id=...&format=csv|xlsx
+```
+
+...and the Phase 5 TDS endpoints:
+
+```
+POST   /api/v1/tds/profile?company_id=...                                    create TDS profile
+GET    /api/v1/tds/sections?company_id=...
+POST   /api/v1/tds/rules?company_id=...
+GET    /api/v1/tds/deductees?company_id=...&search=...
+POST   /api/v1/tds/transactions?company_id=...
+POST   /api/v1/tds/transactions/{id}/{calculate|override|deduct|cancel}?company_id=...
+GET    /api/v1/tds/transactions/payable-summary?company_id=...
+POST   /api/v1/tds/challans?company_id=...
+POST   /api/v1/tds/challans/{id}/allocate?company_id=...
+POST   /api/v1/tds/reconciliation/run?company_id=...&financial_year_id=...
+POST   /api/v1/accounting/imports?company_id=...                             import_type=TDS, reused from Phase 3
+POST   /api/v1/tds/return-periods?company_id=...
+POST   /api/v1/tds/return-periods/{id}/{generate|submit-for-review|approve|finalize}?company_id=...
+GET    /api/v1/tds/return-periods/{id}/reports/{summary|sections|deductees|challans}?company_id=...
+GET    /api/v1/tds/return-periods/{id}/reports/export/{quarterly|reconciliation}?company_id=...&format=csv|xlsx
+POST   /api/v1/tds/review-notes?company_id=...
 ```
 
 ---
@@ -752,8 +867,8 @@ the existing generic `/accounting/imports/*` routes already parametrize on `impo
 ## 20. Future Module Roadmap
 
 These remain route-namespace placeholders only, ready for a future module to fill in
-without touching Phases 1–4 (`/tds`, `/income-tax`, `/bank`,
-`/audit`, `/compliance`, `/tally`, `/integrations`):
+without touching Phases 1–5 (`/income-tax`, `/bank`, `/audit`, `/compliance`, `/tally`,
+`/integrations`):
 
 | Phase | Module |
 |---|---|
@@ -761,9 +876,9 @@ without touching Phases 1–4 (`/tds`, `/income-tax`, `/bank`,
 | 2 | Document management & local data ingestion *(done)* |
 | 3 | Accounting data layer & Tally/Excel/CSV import *(done)* |
 | 4 | GST Compliance — GSTR-1, GSTR-2B reconciliation, ITC, GSTR-3B *(done — no portal filing)* |
-| 5 | TDS Compliance |
+| 5 | TDS Compliance — deductees, rule engine, transactions, challans, reconciliation, quarterly returns *(done — no TRACES/portal filing)* |
 | 6 | Bank Reconciliation |
-| — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter` for an eventual real filing integration, Compliance calendar, live Tally API integration |
+| — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter` for an eventual real filing integration, Compliance calendar, live Tally API integration |
 
 Each future module is expected to live in its own `models/ schemas/ services/
 repositories/ api/` subtree (per `app/core/permissions.py`'s module grouping), reusing —
@@ -845,6 +960,31 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
   be. Generating a return snapshots the numbers at that moment; approving/finalizing acts
   on that frozen version, and a later accounting correction produces version 2 rather than
   silently changing what a reviewer already approved.
+- **The applicability engine is separate from the calculation engine** (Phase 5) —
+  `TDSApplicabilityService` decides *whether* TDS applies (threshold, PAN, rule-effective-
+  date checks) and only ever hands `TDSCalculationService` a confirmed `APPLICABLE` case;
+  the calculator itself has no fallback path for an unresolved case, so a caller literally
+  cannot compute an amount for a transaction the applicability engine hasn't cleared —
+  `TDSRuleEngine` composes the two rather than merging their logic.
+- **A manual override never overwrites the system's answer** (Phase 5) — `TDSTransaction`
+  stores `system_calculated_amount` and `tds_amount` as two separate columns; overriding
+  changes only `tds_amount` (plus `override_reason`/`overridden_by`/`overridden_at`), so an
+  auditor reviewing a transaction later can always see both what the engine calculated and
+  what a human changed it to, and why.
+- **`no_pan_rate` is an explicit, optional column on `TDSRule`, not a hardcoded 20%**
+  (Phase 5) — Section 206AA's higher no-PAN rate is real but not universal across every
+  section/scenario a future rule might need, so the engine reads it from configuration and
+  refuses to calculate (`MISSING_NO_PAN_RATE`) rather than assume 20% when it's unset.
+- **Deductee, not a duplicated Vendor/Customer row, optionally links to one** (Phase 5) —
+  `Deductee.vendor_id`/`customer_id` are nullable FKs so a company's existing Phase 3 party
+  data is reused where it already exists, while still allowing a deductee that isn't
+  otherwise tracked as a Vendor/Customer (e.g. a one-off professional fee) to exist
+  independently.
+- **Reconciliation findings are fully recomputed on every run, never incrementally patched**
+  (Phase 5) — `TDSReconciliationService.run()` clears prior findings for the financial year
+  before regenerating them, the same "it's a report, not a ledger" principle Phase 4's GST
+  reconciliation already established, so a finding can never silently go stale after a
+  challan allocation changes.
 
 ---
 

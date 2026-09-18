@@ -75,3 +75,28 @@ Import order:
 `tests/test_gst_sample_data.py` in the backend imports these exact files through the real
 pipeline and asserts these outcomes — if you ever edit a sample file, run that test to
 confirm the numbers still line up.
+
+## Phase 5 — TDS walkthrough (`sample_tds.csv`)
+
+A file for exercising the TDS reconciliation import (`TDS → Transactions`, or via
+`/accounting/imports/new` with import type `TDS`). Unlike the accounting/GST samples above,
+the **deductees referenced in this file must already exist** before importing — TDS import
+matches deductees by name but never creates one on the fly (PHASE5 section 3: no silent
+guessing). Create these three under `TDS → Deductees` first:
+
+| Name | PAN |
+|---|---|
+| Bright Consulting LLP | AAAPA1234A |
+| Metro Freight Contractors | AABCM5678C |
+| Skyline Properties | AACST9012D |
+
+All dates fall in April 2026, so create a `2026-27` financial year (01/04/2026–31/03/2027)
+and a `Q1` TDS return period before importing.
+
+The fourth row (`Unknown Vendor LLP`) is deliberately invalid — that deductee is never
+created, so the row fails `MISSING_DEDUCTEE` in the import preview rather than silently
+creating a new deductee or being skipped without explanation.
+
+Each imported row lands as a `DEDUCTED` `TDSTransaction` directly (this is reconciliation
+import of already-known TDS data, not a calculation request — see PHASE5 section 29), ready
+to allocate against a `TDSChallan` and reconcile.

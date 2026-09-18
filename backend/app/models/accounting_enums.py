@@ -110,6 +110,7 @@ class ImportType(StrEnum):
     JOURNALS = "JOURNALS"
     TALLY = "TALLY"
     GSTR2B = "GSTR2B"
+    TDS = "TDS"
 
 
 class ImportStatus(StrEnum):

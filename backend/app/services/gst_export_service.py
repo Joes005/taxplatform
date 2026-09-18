@@ -49,7 +49,7 @@ def _stringify(value) -> str:
     return str(value)
 
 
-def _write_csv(*, report_type: str, gstin: str, period_label: str, sections: list[ExportSection]) -> bytes:
+def write_csv(*, report_type: str, gstin: str, period_label: str, sections: list[ExportSection]) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow([report_type])
@@ -66,7 +66,7 @@ def _write_csv(*, report_type: str, gstin: str, period_label: str, sections: lis
     return buf.getvalue().encode("utf-8-sig")
 
 
-def _write_xlsx(*, report_type: str, gstin: str, period_label: str, sections: list[ExportSection]) -> bytes:
+def write_xlsx(*, report_type: str, gstin: str, period_label: str, sections: list[ExportSection]) -> bytes:
     workbook = Workbook()
     cover = workbook.active
     cover.title = "Cover"
@@ -118,13 +118,13 @@ class GSTExportService:
 
     def _render(self, *, report_type: str, gstin: str, period_label: str, sections, fmt: ExportFormat, filename_stub: str) -> ExportFile:
         if fmt == "xlsx":
-            content = _write_xlsx(report_type=report_type, gstin=gstin, period_label=period_label, sections=sections)
+            content = write_xlsx(report_type=report_type, gstin=gstin, period_label=period_label, sections=sections)
             return ExportFile(
                 content=content,
                 filename=f"{filename_stub}.xlsx",
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-        content = _write_csv(report_type=report_type, gstin=gstin, period_label=period_label, sections=sections)
+        content = write_csv(report_type=report_type, gstin=gstin, period_label=period_label, sections=sections)
         return ExportFile(content=content, filename=f"{filename_stub}.csv", media_type="text/csv")
 
     async def export_gstr1(self, company_id, return_period_id, fmt: ExportFormat) -> ExportFile:

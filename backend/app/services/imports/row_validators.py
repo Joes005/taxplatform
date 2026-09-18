@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.accounting_enums import ImportType
 from app.models.customer import Customer
+from app.models.deductee import Deductee
 from app.models.ledger import Ledger
+from app.models.tds_section import TDSSection
 from app.models.vendor import Vendor
 from app.services.imports.normalizers import (
     NormalizationError,
@@ -54,6 +56,8 @@ class ImportContext:
         self.customers_by_name: dict[str, uuid.UUID] = {}
         self.vendors_by_name: dict[str, uuid.UUID] = {}
         self.ledgers_by_name: dict[str, uuid.UUID] = {}
+        self.deductees_by_name: dict[str, uuid.UUID] = {}
+        self.tds_sections_by_code: dict[str, uuid.UUID] = {}
 
     async def load(self) -> None:
         customers = await self.db.execute(
@@ -70,6 +74,14 @@ class ImportContext:
             select(Ledger.id, Ledger.name).where(Ledger.company_id == self.company_id)
         )
         self.ledgers_by_name = {name.strip().lower(): id_ for id_, name in ledgers}
+
+        deductees = await self.db.execute(
+            select(Deductee.id, Deductee.name).where(Deductee.company_id == self.company_id)
+        )
+        self.deductees_by_name = {name.strip().lower(): id_ for id_, name in deductees}
+
+        sections = await self.db.execute(select(TDSSection.id, TDSSection.section_code))
+        self.tds_sections_by_code = {code.strip().upper(): id_ for id_, code in sections}
 
 
 def _require(row: dict, field_name: str) -> str | None:
@@ -543,6 +555,96 @@ def validate_gstr2b_row(row: dict, ctx: ImportContext) -> RowResult:
     return result
 
 
+def validate_tds_row(row: dict, ctx: ImportContext) -> RowResult:
+    """External/actual TDS data (e.g. from last year's records or a CA's
+    working file) being brought in for reconciliation — not something the
+    rule engine (re)computes. `tds_amount` is required precisely because
+    this is reconciliation import, not a calculation request (PHASE5
+    section 29)."""
+    result = RowResult()
+
+    deductee_name = _require(row, "deductee_name")
+    if not deductee_name:
+        result.errors.append(RowError("deductee_name", "MISSING_DEDUCTEE", "Deductee name is required"))
+    deductee_id = ctx.deductees_by_name.get((deductee_name or "").lower())
+    if deductee_name and deductee_id is None:
+        result.errors.append(
+            RowError("deductee_name", "MISSING_DEDUCTEE", f"No deductee named '{deductee_name}' exists")
+        )
+
+    section_code = _require(row, "section_code")
+    if not section_code:
+        result.errors.append(RowError("section_code", "MISSING_SECTION", "TDS section is required"))
+    tds_section_id = ctx.tds_sections_by_code.get((section_code or "").upper())
+    if section_code and tds_section_id is None:
+        result.errors.append(
+            RowError("section_code", "MISSING_SECTION", f"'{section_code}' is not a known TDS section")
+        )
+
+    pan = normalize_text(row.get("pan"))
+    if pan:
+        from app.utils.pan import is_valid_pan
+
+        if not is_valid_pan(pan):
+            result.errors.append(RowError("pan", "INVALID_PAN", f"'{pan}' is not a structurally valid PAN"))
+
+    try:
+        transaction_date = normalize_date(row.get("transaction_date"))
+    except NormalizationError as exc:
+        result.errors.append(RowError("transaction_date", "INVALID_DATE", str(exc)))
+        transaction_date = None
+
+    deduction_date = None
+    if row.get("deduction_date"):
+        try:
+            deduction_date = normalize_date(row.get("deduction_date"))
+        except NormalizationError as exc:
+            result.errors.append(RowError("deduction_date", "INVALID_DATE", str(exc)))
+
+    try:
+        gross_amount = normalize_amount(row.get("gross_amount"))
+        if gross_amount <= 0:
+            raise NormalizationError("Gross amount must be greater than zero")
+    except NormalizationError as exc:
+        result.errors.append(RowError("gross_amount", "INVALID_AMOUNT", str(exc)))
+        gross_amount = None
+
+    try:
+        tds_amount = normalize_amount(row.get("tds_amount"))
+        if tds_amount < 0:
+            raise NormalizationError("TDS amount cannot be negative")
+    except NormalizationError as exc:
+        result.errors.append(RowError("tds_amount", "INVALID_TDS_AMOUNT", str(exc)))
+        tds_amount = None
+
+    try:
+        tds_rate = normalize_optional_amount(row.get("tds_rate"))
+    except NormalizationError as exc:
+        result.errors.append(RowError("tds_rate", "INVALID_TDS_RATE", str(exc)))
+        tds_rate = Decimal("0")
+
+    if result.errors:
+        return result
+
+    if gross_amount is not None and tds_amount is not None and tds_amount > gross_amount:
+        result.errors.append(
+            RowError("tds_amount", "INVALID_TDS_AMOUNT", "TDS amount cannot exceed the gross amount")
+        )
+        return result
+
+    result.normalized = {
+        "deductee_id": deductee_id,
+        "tds_section_id": tds_section_id,
+        "pan": pan,
+        "transaction_date": transaction_date,
+        "deduction_date": deduction_date or transaction_date,
+        "gross_amount": gross_amount,
+        "tds_amount": tds_amount,
+        "tds_rate": tds_rate,
+    }
+    return result
+
+
 VALIDATORS = {
     ImportType.CUSTOMERS: validate_customer_row,
     ImportType.VENDORS: validate_vendor_row,
@@ -555,6 +657,7 @@ VALIDATORS = {
     ImportType.JOURNALS: validate_journal_row,
     ImportType.TALLY: validate_sales_row,
     ImportType.GSTR2B: validate_gstr2b_row,
+    ImportType.TDS: validate_tds_row,
 }
 
 

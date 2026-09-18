@@ -38,6 +38,17 @@ from app.api import (
     reports,
     roles,
     sales_invoices,
+    tds_challans,
+    tds_profile,
+    tds_reconciliation,
+    tds_reports,
+    tds_return_periods,
+    tds_return_snapshots,
+    tds_review_notes,
+    tds_rules,
+    tds_sections,
+    tds_transactions,
+    deductees,
     users,
     vendors,
     audit_logs,
@@ -143,3 +154,14 @@ app.include_router(gstr2b.router, prefix=settings.API_V1_PREFIX)
 app.include_router(gst_reconciliation.router, prefix=settings.API_V1_PREFIX)
 app.include_router(itc.router, prefix=settings.API_V1_PREFIX)
 app.include_router(gstr3b.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_profile.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_sections.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_rules.router, prefix=settings.API_V1_PREFIX)
+app.include_router(deductees.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_transactions.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_challans.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_reconciliation.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_return_periods.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_return_snapshots.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_review_notes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tds_reports.router, prefix=settings.API_V1_PREFIX)

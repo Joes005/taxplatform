@@ -98,6 +98,8 @@ async def create_import_job(
 ):
     if payload.import_type == ImportType.GSTR2B:
         await _ensure_permission(db, current_user, membership, PermissionCode.GSTR2B_IMPORT)
+    elif payload.import_type == ImportType.TDS:
+        await _ensure_permission(db, current_user, membership, PermissionCode.TDS_IMPORT)
 
     document = await DocumentService(db, storage).get_document(
         company_id=company_id, document_id=payload.document_id
@@ -204,6 +206,8 @@ async def commit_import_job(
     existing = await service.get(company_id, job_id)
     if existing.import_type == ImportType.GSTR2B:
         await _ensure_permission(db, current_user, membership, PermissionCode.GSTR2B_IMPORT)
+    elif existing.import_type == ImportType.TDS:
+        await _ensure_permission(db, current_user, membership, PermissionCode.TDS_IMPORT_COMMIT)
 
     job = await service.commit(company_id, job_id, current_user, meta)
     await db.commit()

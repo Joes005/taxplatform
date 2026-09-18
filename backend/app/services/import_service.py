@@ -23,8 +23,12 @@ from app.models.product_service import ProductService
 from app.models.purchase_invoice import PurchaseInvoice
 from app.models.receipt import Receipt
 from app.models.sales_invoice import SalesInvoice
+from app.models.tds_enums import PANStatus, TDSApplicabilityStatus, TDSTransactionStatus
+from app.models.tds_transaction import TDSTransaction
 from app.models.user import User
 from app.models.vendor import Vendor
+from app.repositories.deductee_repository import DeducteeRepository
+from app.repositories.financial_year_repository import FinancialYearRepository
 from app.repositories.import_job_repository import ImportJobRepository
 from app.repositories.purchase_invoice_repository import PurchaseInvoiceRepository
 from app.repositories.sales_invoice_repository import SalesInvoiceRepository
@@ -45,6 +49,8 @@ class ImportService:
         self.repo = ImportJobRepository(db)
         self.sales_invoices = SalesInvoiceRepository(db)
         self.purchase_invoices = PurchaseInvoiceRepository(db)
+        self.deductees = DeducteeRepository(db)
+        self.financial_years = FinancialYearRepository(db)
         self.audit = AuditService(db)
 
     # ------------------------------------------------------------------
@@ -215,6 +221,14 @@ class ImportService:
             return ("ledger", normalized.get("name", "").lower())
         if import_type == ImportType.GSTR2B:
             return ("gstr2b", normalized.get("supplier_gstin"), normalized.get("invoice_number"))
+        if import_type == ImportType.TDS:
+            return (
+                "tds",
+                normalized.get("deductee_id"),
+                normalized.get("tds_section_id"),
+                str(normalized.get("transaction_date")),
+                str(normalized.get("gross_amount")),
+            )
         return None
 
     async def _check_existing_duplicate(
@@ -307,6 +321,8 @@ class ImportService:
                 await self._commit_journals(company_id, job, valid_rows)
             elif job.import_type == ImportType.GSTR2B:
                 await self._commit_gstr2b(company_id, job, valid_rows)
+            elif job.import_type == ImportType.TDS:
+                await self._commit_tds(company_id, job, valid_rows)
         except Exception:
             await self.db.rollback()
             job.status = ImportStatus.FAILED
@@ -573,6 +589,49 @@ class ImportService:
                 r.status = RowStatus.COMMITTED
                 r.created_record_id = str(entry.id)
 
+
+    async def _commit_tds(self, company_id: uuid.UUID, job: ImportJob, rows: list[ImportRow]) -> None:
+        for row in rows:
+            data = row.normalized_data
+            transaction_date = _to_date(data["transaction_date"])
+
+            financial_year = await self.financial_years.get_for_date(company_id, transaction_date)
+            if financial_year is None:
+                row.status = RowStatus.ERROR
+                continue
+
+            deductee = await self.deductees.get_by_id_for_company(
+                uuid.UUID(data["deductee_id"]), company_id
+            )
+            gross_amount = round_money(_dec(data["gross_amount"]))
+            tds_amount = round_money(_dec(data["tds_amount"]))
+            tds_rate = _dec(data.get("tds_rate") or "0")
+            if tds_rate == 0 and gross_amount > 0:
+                tds_rate = (tds_amount / gross_amount * 100).quantize(_dec("0.01"))
+
+            transaction = TDSTransaction(
+                company_id=company_id,
+                financial_year_id=financial_year.id,
+                deductee_id=uuid.UUID(data["deductee_id"]),
+                tds_section_id=uuid.UUID(data["tds_section_id"]),
+                source=DataSource.CSV,
+                source_reference=f"import:{job.id}:row:{row.row_number}",
+                transaction_date=transaction_date,
+                deduction_date=_to_date(data["deduction_date"]) if data.get("deduction_date") else transaction_date,
+                gross_amount=gross_amount,
+                taxable_amount=gross_amount,
+                tds_rate=tds_rate,
+                tds_amount=tds_amount,
+                net_amount=gross_amount - tds_amount,
+                pan_status=deductee.pan_status if deductee else PANStatus.NOT_AVAILABLE,
+                applicability_status=TDSApplicabilityStatus.APPLICABLE,
+                applicability_reason="Imported from external TDS data for reconciliation",
+                status=TDSTransactionStatus.DEDUCTED,
+            )
+            self.db.add(transaction)
+            await self.db.flush()
+            row.status = RowStatus.COMMITTED
+            row.created_record_id = str(transaction.id)
 
     async def _commit_gstr2b(
         self, company_id: uuid.UUID, job: ImportJob, rows: list[ImportRow]

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Building2, ScrollText, Users, ArrowUpRight, Landmark, FileText, GitMerge, ShieldCheck } from "lucide-react";
+import { Building2, ScrollText, Users, ArrowUpRight, Landmark, FileText, GitMerge, ShieldCheck, Calculator } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanies } from "@/hooks/useCompanies";
@@ -11,11 +11,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/utils";
 
 const MODULE_PLACEHOLDERS = [
-  { title: "Documents", subtitle: "Available now", icon: FileText, status: "available" as const },
-  { title: "GST Compliance", subtitle: "Coming in Phase 3", icon: Landmark, status: "planned" as const },
-  { title: "TDS Compliance", subtitle: "Coming in Phase 4", icon: Landmark, status: "planned" as const },
-  { title: "Reconciliation", subtitle: "Coming in Phase 5", icon: GitMerge, status: "planned" as const },
-  { title: "Audit", subtitle: "Foundation available", icon: ShieldCheck, status: "available" as const },
+  { title: "Documents", subtitle: "Available now", icon: FileText, status: "available" as const, to: "/documents" },
+  { title: "Accounting", subtitle: "Available now", icon: Landmark, status: "available" as const, to: "/accounting/dashboard" },
+  { title: "GST Compliance", subtitle: "Available now", icon: ShieldCheck, status: "available" as const, to: "/gst" },
+  { title: "TDS Compliance", subtitle: "Available now", icon: Calculator, status: "available" as const, to: "/tds" },
+  { title: "Bank Reconciliation", subtitle: "Coming in a future phase", icon: GitMerge, status: "planned" as const, to: null },
+  { title: "Audit", subtitle: "Foundation available", icon: ShieldCheck, status: "available" as const, to: "/audit-logs" },
 ];
 
 export default function DashboardPage() {
@@ -61,22 +62,29 @@ export default function DashboardPage() {
           Compliance Modules
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {MODULE_PLACEHOLDERS.map((m) => (
-            <Card key={m.title}>
-              <CardContent className="flex flex-col gap-3 pt-6">
-                <div className="flex items-center justify-between">
-                  <m.icon className="h-5 w-5 text-muted-foreground" />
-                  <Badge variant={m.status === "available" ? "success" : "secondary"}>
-                    {m.status === "available" ? "Available" : "Planned"}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="font-medium">{m.title}</p>
-                  <p className="text-xs text-muted-foreground">{m.subtitle}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {MODULE_PLACEHOLDERS.map((m) => {
+            const card = (
+              <Card className={m.to ? "transition-colors hover:border-primary/40" : undefined}>
+                <CardContent className="flex flex-col gap-3 pt-6">
+                  <div className="flex items-center justify-between">
+                    <m.icon className="h-5 w-5 text-muted-foreground" />
+                    <Badge variant={m.status === "available" ? "success" : "secondary"}>
+                      {m.status === "available" ? "Available" : "Planned"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="font-medium">{m.title}</p>
+                    <p className="text-xs text-muted-foreground">{m.subtitle}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+            return m.to ? (
+              <Link key={m.title} to={m.to}>{card}</Link>
+            ) : (
+              <div key={m.title}>{card}</div>
+            );
+          })}
         </div>
       </div>
 
