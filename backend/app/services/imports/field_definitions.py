@@ -124,6 +124,17 @@ JOURNAL_FIELDS = [
     FieldDefinition("narration", "Narration"),
 ]
 
+BANK_STATEMENT_FIELDS = [
+    FieldDefinition("transaction_date", "Transaction Date", required=True),
+    FieldDefinition("value_date", "Value Date"),
+    FieldDefinition("description", "Description / Narration", required=True),
+    FieldDefinition("reference_number", "Reference Number"),
+    FieldDefinition("cheque_number", "Cheque Number"),
+    FieldDefinition("debit_amount", "Debit / Withdrawal"),
+    FieldDefinition("credit_amount", "Credit / Deposit"),
+    FieldDefinition("balance_after_transaction", "Balance"),
+]
+
 TDS_FIELDS = [
     FieldDefinition("deductee_name", "Deductee Name", required=True),
     FieldDefinition("pan", "Deductee PAN"),
@@ -147,6 +158,7 @@ FIELD_DEFINITIONS_BY_TYPE: dict[ImportType, list[FieldDefinition]] = {
     ImportType.JOURNALS: JOURNAL_FIELDS,
     ImportType.GSTR2B: GSTR2B_FIELDS,
     ImportType.TDS: TDS_FIELDS,
+    ImportType.BANK_STATEMENT: BANK_STATEMENT_FIELDS,
     # A Tally CSV/XLSX export is structurally a sales-register-style
     # export in practice; reuse the SALES mapping rather than inventing a
     # separate schema for it.

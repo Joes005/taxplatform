@@ -13,6 +13,9 @@ class ImportJobCreate(BaseModel):
     return_period_id: uuid.UUID | None = Field(
         default=None, description="Required when import_type is GSTR2B"
     )
+    bank_statement_id: uuid.UUID | None = Field(
+        default=None, description="Required when import_type is BANK_STATEMENT"
+    )
     column_mapping: dict[str, str] = Field(
         description="Maps each source file column name to a system field name"
     )
@@ -25,6 +28,7 @@ class ImportJobRead(BaseModel):
     document_id: uuid.UUID
     financial_year_id: uuid.UUID | None
     return_period_id: uuid.UUID | None
+    bank_statement_id: uuid.UUID | None
     import_type: ImportType
     status: ImportStatus
     column_mapping: dict | None

@@ -5,6 +5,7 @@
 **Phase 3 — Accounting Data Layer & Tally/Excel/CSV Import**
 **Phase 4 — GST Compliance Engine (GSTR-1, GSTR-2B Reconciliation, ITC, GSTR-3B)**
 **Phase 5 — TDS Compliance Engine (Deductees, Rule Engine, Challans, Reconciliation, Returns)**
+**Phase 6 — Bank Reconciliation Engine (Statement Import, Matching, Review Workflow)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -19,23 +20,33 @@ and reconciliation, an ITC review workflow, and GSTR-3B preparation. Phase 5 bui
 **preparation and review** engine alongside it — deductee management, a configurable/
 effective-dated rule engine that decides applicability and calculates deductions (never
 silently), the deduction lifecycle through to challan tracking and payment reconciliation,
-and quarterly TDS return preparation — all for a CA/auditor to review before filing
-elsewhere.
+and quarterly TDS return preparation. Phase 6 builds a bank reconciliation engine on top of
+the same accounting layer — bank statement import with checksum-based duplicate detection,
+a deterministic (no-AI) point-scored matching engine against existing Payments/Receipts/
+Journal Entries, manual and partial matching with over-allocation guards, adjustment journal
+entries for bank charges/interest, and a full reconciliation session review workflow — all
+for a CA/auditor to review before anything is filed or acted on elsewhere.
 
 > **Scope note:** GST/TDS/Income Tax *filing*, live Tally API integration, OCR/AI
 > extraction, and government portal integration are intentionally **not implemented**.
 > Phase 4 specifically does **not**: log into the GST portal, fetch GSTR-2B live, file
 > GSTR-1/GSTR-3B, submit any return, or process a GST payment/challan. Phase 5 specifically
 > does **not**: log into the TRACES/Income Tax e-filing portal, verify a PAN/TAN against any
-> government service, file 24Q/26Q/27Q/27EQ, or pay a TDS challan — both only prepare,
-> calculate, validate, reconcile, and export data locally so a human files it elsewhere.
-> Where the platform anticipates a not-yet-built integration (e.g. structural-only PAN/TAN
-> validation), it is marked as a future module, not a stubbed-in fake. **No phase has a paid
-> or cloud dependency** — documents are validated and stored entirely on the local
+> government service, file 24Q/26Q/27Q/27EQ, or pay a TDS challan. Phase 6 specifically does
+> **not**: connect to any bank (no Open Banking, OAuth, or bank API), fetch live transactions,
+> or use AI/ML for matching — it is entirely file-import-based and every match is either a
+> deterministic point-score result or an explicit human choice. All three only prepare,
+> calculate, validate, reconcile, and export data locally so a human files or acts on it
+> elsewhere. Where the platform anticipates a not-yet-built integration (e.g. structural-only
+> PAN/TAN validation, or bank statement import — CSV/XLSX only today through the same
+> adapter interface Phase 3's import pipeline already defines, deliberately not duplicated
+> for a future live bank-feed provider), it is marked as a future module, not a stubbed-in
+> fake. **No phase has
+> a paid or cloud dependency** — documents are validated and stored entirely on the local
 > filesystem, accounting data is imported from files the user already has (a Tally *export*,
-> not a live Tally connection), and GSTR-2B/TDS reconciliation data are imported from local
-> CSV/XLSX/JSON files, never fetched from any government portal; everything runs offline via
-> `docker compose up`.
+> not a live Tally connection), and GSTR-2B/TDS/bank-statement reconciliation data are all
+> imported from local CSV/XLSX/JSON files, never fetched live from any government portal or
+> bank; everything runs offline via `docker compose up`.
 
 ---
 
@@ -151,6 +162,44 @@ Core Phase 5 capabilities:
 - A full TDS React UI: dashboard, deductees/transactions/challans pages, and a return-period
   detail page with Overview/Sections/Deductees/Challans/Reconciliation/Review Notes tabs,
   wired through the same RBAC/permission-gating conventions as Phases 1–4
+
+Core Phase 6 capabilities:
+
+- **Bank accounts** that only ever store a masked account number (`account_number_masked`,
+  e.g. `XXXXXX1234`) — the full number is never collected — optionally linked to a Phase 3
+  `Ledger` so "book balance" can be computed from the real chart of accounts instead of a
+  second, parallel balance this module would have to keep in sync itself
+- **Bank statement import** reusing Phase 3's import pipeline unchanged (new
+  `BANK_STATEMENT` import type): flexible column mapping, light-touch normalization that
+  never overwrites the bank's own original description, and a deterministic SHA-256
+  **checksum** (`company + account + date + amount + reference + description`) enforced by
+  both application-level duplicate detection and a DB unique index — never description
+  matching alone
+- **Opening/closing balance validation** on every imported statement
+  (`opening + credits − debits = closing`), surfaced as a non-blocking `balanced: bool` +
+  `difference` finding rather than rejecting an otherwise-valid partial statement
+- A **deterministic, no-AI matching engine** (`BankMatchingService`) — a fixed point system
+  (exact amount as the base filter, +30 exact reference, +15 exact date, +10 counterparty,
+  +5 description overlap) against Payments, Receipts, and Journal Entry lines touching the
+  account's linked ledger; auto-matching only fires when exactly one candidate clears the
+  strong-match threshold — any tie or weak signal is left as `MATCH_SUGGESTED` /
+  `REVIEW_REQUIRED` for a human, never force-picked (mirroring GST/TDS's "flag, don't guess"
+  principle)
+- **Manual and partial matching** — one bank transaction can be split across several
+  accounting records (or vice versa), with over-allocation blocked on both the bank-transaction
+  side and the accounting-record side, and every match reversible (soft `REVERSED` status,
+  never deleted, so match history is permanent)
+- **Adjustments reuse Phase 3's `JournalEntryService` directly** — a bank charge or interest
+  line becomes a real, POSTED journal entry (subject to the existing period-lock check) plus
+  an `ADJUSTMENT`-type match, never a parallel adjustment ledger
+- **Reconciliation sessions** with a full `OPEN → IN_PROGRESS → PENDING_REVIEW → RECONCILED →
+  LOCKED` review workflow (Accountant runs/submits, Auditor approves/rejects/locks), bank vs.
+  book balance/difference calculation, and unmatched-bank/unmatched-book/matching reports with
+  local CSV/XLSX export
+- A full Banking React UI: dashboard, accounts, statements (feeding the same generic import
+  wizard Phases 3–5 already use), transactions, and a reconciliation session detail page with
+  live match-candidate selection, wired through the same RBAC/permission-gating conventions
+  as Phases 1–5
 
 ---
 
@@ -423,6 +472,16 @@ all): `tds_profiles`, `tds_sections`, `tds_rules`, and `deductees` (foundation);
 runs — e.g. `(company_id, status)` and `(company_id, transaction_date)` on
 `tds_transactions` for the payable summary and quarterly reports.
 
+Phase 6 adds two migrations: one creating `bank_accounts`, `bank_statements`,
+`bank_transactions`, `bank_transaction_matches`, and `bank_reconciliations` (a unique index
+on `(company_id, bank_account_id, checksum)` on `bank_transactions` enforces duplicate
+detection at the database layer, not just in the import pipeline); a second adds a nullable
+`bank_statement_id` to the existing `import_jobs` table, the same generalization
+`return_period_id`/`bank_statement_id` already represent for GST/TDS/bank imports. The
+`BANK_STATEMENT` import type itself needed no migration — like `TDS` before it, `ImportType`
+is a non-native enum stored as plain `VARCHAR`. No Phase 1–5 table is altered beyond that one
+additive column.
+
 ## 9. Seed Data
 
 ```bash
@@ -572,8 +631,32 @@ Coverage includes:
   changed since v1; review-note creation and the "cannot resolve twice" guard; the
   quarterly/section summary report endpoints; the `TDS_PROFILE_REQUIRED` export guard and a
   successful CSV export
+- **Bank accounts (Phase 6):** create/get, the masked-account-number duplicate guard
+  (`DUPLICATE_RESOURCE` from the DB unique index), the invalid-linked-ledger rejection,
+  tenant isolation, RBAC (an Auditor cannot create an account)
+- **Bank statement import:** valid CSV import and commit creating `UNMATCHED` transactions
+  with correct debit/credit/type and normalized-description derivation; the
+  `BOTH_DEBIT_AND_CREDIT` row-validation rejection; duplicate-row detection via checksum; the
+  statement balance-check endpoint correctly reporting both a balanced and a deliberately
+  mismatched statement; exclude/flag-for-review transitions and their "already excluded"
+  guard
+- **Matching engine:** an unambiguous strong candidate (exact amount + reference + date)
+  auto-matching and creating an `AUTO` match; two same-amount candidates correctly producing
+  `REVIEW_REQUIRED`/`MATCH_SUGGESTED` with both surfaced via the candidates endpoint rather
+  than one being silently picked; partial matching across two receipts summing to one bank
+  transaction; the `MATCH_AMOUNT_EXCEEDS_BANK_TRANSACTION` over-allocation guard; match
+  reversal restoring `UNMATCHED` status
+- **Reconciliation workflow:** the full `run-matching → submit → approve → lock` sequence
+  with status kept in sync at each step; the "locked cannot transition further" guard; the
+  duplicate-session-for-the-same-period guard; RBAC (an Auditor cannot run matching but can
+  approve/lock)
+- **Adjustments:** a bank-charges transaction correctly producing a POSTED journal entry and
+  moving the transaction to `MANUALLY_MATCHED`; the `BANK_ACCOUNT_LEDGER_REQUIRED` guard when
+  the account has no linked ledger
+- **Bank reports:** the unmatched-bank-transactions and matching-report endpoints returning
+  correct rows for a known scenario; a successful CSV export
 
-As of Phase 5, the full suite is **240 tests**, all passing against a real PostgreSQL
+As of Phase 6, the full suite is **264 tests**, all passing against a real PostgreSQL
 database.
 
 ## 13. API Documentation
@@ -629,6 +712,27 @@ POST   /api/v1/tds/return-periods/{id}/{generate|submit-for-review|approve|final
 GET    /api/v1/tds/return-periods/{id}/reports/{summary|sections|deductees|challans}?company_id=...
 GET    /api/v1/tds/return-periods/{id}/reports/export/{quarterly|reconciliation}?company_id=...&format=csv|xlsx
 POST   /api/v1/tds/review-notes?company_id=...
+```
+
+...and the Phase 6 bank reconciliation endpoints:
+
+```
+POST   /api/v1/bank/accounts?company_id=...                                  create bank account
+POST   /api/v1/bank/statements?company_id=...                                register a statement
+GET    /api/v1/bank/statements/{id}/balance-check?company_id=...
+POST   /api/v1/accounting/imports?company_id=...                             import_type=BANK_STATEMENT, reused from Phase 3
+GET    /api/v1/bank/statements/{id}/transactions?company_id=...
+GET    /api/v1/bank/transactions?company_id=...&reconciliation_status=...
+POST   /api/v1/bank/transactions/{id}/{exclude|review}?company_id=...
+GET    /api/v1/bank/transactions/{id}/candidates?company_id=...              scored match candidates
+POST   /api/v1/bank/transactions/{id}/match?company_id=...                   manual/partial match
+POST   /api/v1/bank/matches/{id}/reverse?company_id=...
+POST   /api/v1/bank/transactions/{id}/adjust?company_id=...                  posts a real JournalEntry
+POST   /api/v1/bank/reconciliations?company_id=...                           start a session
+POST   /api/v1/bank/reconciliations/{id}/run-matching?company_id=...
+POST   /api/v1/bank/reconciliations/{id}/{submit|approve|reject|lock|cancel}?company_id=...
+GET    /api/v1/bank/reports/{unmatched-bank-transactions|unmatched-book-transactions|matches}?company_id=...
+GET    /api/v1/bank/reports/reconciliations/{id}/export?company_id=...&format=csv|xlsx
 ```
 
 ---
@@ -867,7 +971,7 @@ the existing generic `/accounting/imports/*` routes already parametrize on `impo
 ## 20. Future Module Roadmap
 
 These remain route-namespace placeholders only, ready for a future module to fill in
-without touching Phases 1–5 (`/income-tax`, `/bank`, `/audit`, `/compliance`, `/tally`,
+without touching Phases 1–6 (`/income-tax`, `/audit`, `/compliance`, `/tally`,
 `/integrations`):
 
 | Phase | Module |
@@ -877,8 +981,8 @@ without touching Phases 1–5 (`/income-tax`, `/bank`, `/audit`, `/compliance`, 
 | 3 | Accounting data layer & Tally/Excel/CSV import *(done)* |
 | 4 | GST Compliance — GSTR-1, GSTR-2B reconciliation, ITC, GSTR-3B *(done — no portal filing)* |
 | 5 | TDS Compliance — deductees, rule engine, transactions, challans, reconciliation, quarterly returns *(done — no TRACES/portal filing)* |
-| 6 | Bank Reconciliation |
-| — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter` for an eventual real filing integration, Compliance calendar, live Tally API integration |
+| 6 | Bank Reconciliation — statement import, deterministic matching engine, manual/partial matching, adjustments, review workflow *(done — no live bank connection, no AI)* |
+| — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter`/`OpenBankingProvider` for an eventual real filing/bank-feed integration, Compliance calendar, live Tally API integration |
 
 Each future module is expected to live in its own `models/ schemas/ services/
 repositories/ api/` subtree (per `app/core/permissions.py`'s module grouping), reusing —
@@ -985,6 +1089,33 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
   before regenerating them, the same "it's a report, not a ledger" principle Phase 4's GST
   reconciliation already established, so a finding can never silently go stale after a
   challan allocation changes.
+- **Only a masked bank account number is ever collected, not encrypted-and-stored** (Phase
+  6) — `BankAccount.account_number_masked` accepts exactly what the user types (e.g.
+  `XXXXXX1234`); the platform never asks for, transmits, or stores a full account number, so
+  there is nothing sensitive to protect at rest or accidentally log in the first place.
+- **The matching engine is a fixed point-score system, not a similarity threshold or ML
+  model** (Phase 6) — `BankMatchingService`'s weights (`SCORE_EXACT_AMOUNT`,
+  `SCORE_EXACT_REFERENCE`, ...) are named module constants, so the exact same inputs always
+  produce the exact same score and an auditor can read the source to know precisely why a
+  match scored what it did — never a black box.
+- **Auto-matching requires both a strong score and zero ties for the top score** (Phase 6) —
+  two candidates at the same top score (e.g. two receipts of the same amount on the same
+  day) block auto-matching even if that score would otherwise clear the threshold; ambiguity
+  itself, not just a low score, is treated as a reason to ask a human (PHASE6 §20).
+- **`BankTransactionMatch.source_type`/`source_id` is a generic reference, not three nullable
+  FKs** (Phase 6) — mirrors `TDSTransaction.source_type`/`source_id` from Phase 5: a match
+  points to exactly one of Payment/Receipt/JournalEntry, and the same shape works whichever
+  it is, without a `CHECK` constraint enumerating "exactly one of three FKs is set."
+- **Bank adjustments call `JournalEntryService.create()` and `.post()` directly, never
+  duplicate their validation** (Phase 6) — an adjustment is a real, POSTED journal entry
+  subject to the exact same financial-year and period-lock checks every other journal entry
+  already goes through; `BankAdjustmentService` only builds the two offsetting lines and
+  records the resulting `ADJUSTMENT` match, it owns no accounting logic of its own.
+- **Reconciliation status transitions are a `(from_status, action) -> to_status` lookup
+  table, not scattered `if` statements** (Phase 6) — the same pattern Phase 4/5's return
+  workflows already use for `GSTReturnSnapshot`/`TDSReturnSnapshot`; an unlisted transition
+  (e.g. submitting a `LOCKED` session) is refused by construction rather than by remembering
+  to add a check.
 
 ---
 

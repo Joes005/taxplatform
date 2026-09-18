@@ -143,6 +143,33 @@ class PermissionCode(StrEnum):
     TDS_REPORT_VIEW = "TDS_REPORT_VIEW"
     TDS_REPORT_EXPORT = "TDS_REPORT_EXPORT"
 
+    # --- Bank Reconciliation (Phase 6) ---
+    BANK_VIEW = "BANK_VIEW"
+    BANK_CREATE = "BANK_CREATE"
+    BANK_UPDATE = "BANK_UPDATE"
+
+    BANK_STATEMENT_VIEW = "BANK_STATEMENT_VIEW"
+    BANK_STATEMENT_IMPORT = "BANK_STATEMENT_IMPORT"
+    BANK_STATEMENT_IMPORT_COMMIT = "BANK_STATEMENT_IMPORT_COMMIT"
+
+    BANK_TRANSACTION_VIEW = "BANK_TRANSACTION_VIEW"
+    BANK_TRANSACTION_UPDATE = "BANK_TRANSACTION_UPDATE"
+
+    BANK_MATCH_VIEW = "BANK_MATCH_VIEW"
+    BANK_MATCH_CREATE = "BANK_MATCH_CREATE"
+    BANK_MATCH_REVERSE = "BANK_MATCH_REVERSE"
+
+    BANK_ADJUST = "BANK_ADJUST"
+
+    BANK_RECONCILE_VIEW = "BANK_RECONCILE_VIEW"
+    BANK_RECONCILE_RUN = "BANK_RECONCILE_RUN"
+    BANK_RECONCILE_SUBMIT = "BANK_RECONCILE_SUBMIT"
+    BANK_RECONCILE_APPROVE = "BANK_RECONCILE_APPROVE"
+    BANK_RECONCILE_LOCK = "BANK_RECONCILE_LOCK"
+
+    BANK_REPORT_VIEW = "BANK_REPORT_VIEW"
+    BANK_REPORT_EXPORT = "BANK_REPORT_EXPORT"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -252,6 +279,25 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.TDS_IMPORT_COMMIT, "TDS", "Commit TDS data imports"),
     (PermissionCode.TDS_REPORT_VIEW, "TDS", "View TDS reports"),
     (PermissionCode.TDS_REPORT_EXPORT, "TDS", "Export TDS preparation/reconciliation reports"),
+    (PermissionCode.BANK_VIEW, "BANK", "View bank accounts"),
+    (PermissionCode.BANK_CREATE, "BANK", "Create bank accounts"),
+    (PermissionCode.BANK_UPDATE, "BANK", "Update bank accounts"),
+    (PermissionCode.BANK_STATEMENT_VIEW, "BANK", "View bank statements and their transactions"),
+    (PermissionCode.BANK_STATEMENT_IMPORT, "BANK", "Upload and preview bank statement imports"),
+    (PermissionCode.BANK_STATEMENT_IMPORT_COMMIT, "BANK", "Commit bank statement imports"),
+    (PermissionCode.BANK_TRANSACTION_VIEW, "BANK", "View bank transactions"),
+    (PermissionCode.BANK_TRANSACTION_UPDATE, "BANK", "Exclude/flag bank transactions for review"),
+    (PermissionCode.BANK_MATCH_VIEW, "BANK", "View match candidates and match history"),
+    (PermissionCode.BANK_MATCH_CREATE, "BANK", "Create manual/partial matches"),
+    (PermissionCode.BANK_MATCH_REVERSE, "BANK", "Reverse an existing match"),
+    (PermissionCode.BANK_ADJUST, "BANK", "Create an adjustment journal entry from a bank transaction"),
+    (PermissionCode.BANK_RECONCILE_VIEW, "BANK", "View reconciliation sessions"),
+    (PermissionCode.BANK_RECONCILE_RUN, "BANK", "Start a reconciliation session and run auto-matching"),
+    (PermissionCode.BANK_RECONCILE_SUBMIT, "BANK", "Submit a reconciliation session for review"),
+    (PermissionCode.BANK_RECONCILE_APPROVE, "BANK", "Approve/reject a reconciliation session"),
+    (PermissionCode.BANK_RECONCILE_LOCK, "BANK", "Lock a reconciled session"),
+    (PermissionCode.BANK_REPORT_VIEW, "BANK", "View bank reconciliation reports"),
+    (PermissionCode.BANK_REPORT_EXPORT, "BANK", "Export bank reconciliation reports"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -356,6 +402,25 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.TDS_IMPORT_COMMIT,
         PermissionCode.TDS_REPORT_VIEW,
         PermissionCode.TDS_REPORT_EXPORT,
+        PermissionCode.BANK_VIEW,
+        PermissionCode.BANK_CREATE,
+        PermissionCode.BANK_UPDATE,
+        PermissionCode.BANK_STATEMENT_VIEW,
+        PermissionCode.BANK_STATEMENT_IMPORT,
+        PermissionCode.BANK_STATEMENT_IMPORT_COMMIT,
+        PermissionCode.BANK_TRANSACTION_VIEW,
+        PermissionCode.BANK_TRANSACTION_UPDATE,
+        PermissionCode.BANK_MATCH_VIEW,
+        PermissionCode.BANK_MATCH_CREATE,
+        PermissionCode.BANK_MATCH_REVERSE,
+        PermissionCode.BANK_ADJUST,
+        PermissionCode.BANK_RECONCILE_VIEW,
+        PermissionCode.BANK_RECONCILE_RUN,
+        PermissionCode.BANK_RECONCILE_SUBMIT,
+        PermissionCode.BANK_RECONCILE_APPROVE,
+        PermissionCode.BANK_RECONCILE_LOCK,
+        PermissionCode.BANK_REPORT_VIEW,
+        PermissionCode.BANK_REPORT_EXPORT,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
@@ -435,6 +500,23 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.TDS_IMPORT_COMMIT,
         PermissionCode.TDS_REPORT_VIEW,
         PermissionCode.TDS_REPORT_EXPORT,
+        PermissionCode.BANK_VIEW,
+        PermissionCode.BANK_CREATE,
+        PermissionCode.BANK_UPDATE,
+        PermissionCode.BANK_STATEMENT_VIEW,
+        PermissionCode.BANK_STATEMENT_IMPORT,
+        PermissionCode.BANK_STATEMENT_IMPORT_COMMIT,
+        PermissionCode.BANK_TRANSACTION_VIEW,
+        PermissionCode.BANK_TRANSACTION_UPDATE,
+        PermissionCode.BANK_MATCH_VIEW,
+        PermissionCode.BANK_MATCH_CREATE,
+        PermissionCode.BANK_MATCH_REVERSE,
+        PermissionCode.BANK_ADJUST,
+        PermissionCode.BANK_RECONCILE_VIEW,
+        PermissionCode.BANK_RECONCILE_RUN,
+        PermissionCode.BANK_RECONCILE_SUBMIT,
+        PermissionCode.BANK_REPORT_VIEW,
+        PermissionCode.BANK_REPORT_EXPORT,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
@@ -470,6 +552,14 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.TDS_RETURN_APPROVE,
         PermissionCode.TDS_RETURN_FINALIZE,
         PermissionCode.TDS_REPORT_VIEW,
+        PermissionCode.BANK_VIEW,
+        PermissionCode.BANK_STATEMENT_VIEW,
+        PermissionCode.BANK_TRANSACTION_VIEW,
+        PermissionCode.BANK_MATCH_VIEW,
+        PermissionCode.BANK_RECONCILE_VIEW,
+        PermissionCode.BANK_RECONCILE_APPROVE,
+        PermissionCode.BANK_RECONCILE_LOCK,
+        PermissionCode.BANK_REPORT_VIEW,
     ],
 }
 

@@ -555,6 +555,79 @@ def validate_gstr2b_row(row: dict, ctx: ImportContext) -> RowResult:
     return result
 
 
+def validate_bank_statement_row(row: dict, ctx: ImportContext) -> RowResult:
+    """No ImportContext lookups needed — a bank statement row stands
+    alone, unlike sales/purchase rows that resolve a party name to an id.
+    Exactly one of debit/credit must be populated (PHASE6 §50); the
+    normalized fields are computed here but `description` itself is
+    passed through untouched (PHASE6 §11)."""
+    from app.utils.bank_normalization import normalize_bank_text
+
+    result = RowResult()
+
+    try:
+        transaction_date = normalize_date(row.get("transaction_date"))
+    except NormalizationError as exc:
+        result.errors.append(RowError("transaction_date", "INVALID_DATE", str(exc)))
+        transaction_date = None
+
+    value_date = None
+    if row.get("value_date"):
+        try:
+            value_date = normalize_date(row.get("value_date"))
+        except NormalizationError as exc:
+            result.errors.append(RowError("value_date", "INVALID_DATE", str(exc)))
+
+    description = normalize_text(row.get("description"))
+    if not description:
+        result.errors.append(
+            RowError("description", "MISSING_REQUIRED_FIELD", "Description is required")
+        )
+
+    try:
+        debit_amount = normalize_optional_amount(row.get("debit_amount"))
+        credit_amount = normalize_optional_amount(row.get("credit_amount"))
+        if debit_amount < 0 or credit_amount < 0:
+            raise NormalizationError("Debit/credit amounts cannot be negative")
+    except NormalizationError as exc:
+        result.errors.append(RowError(None, "INVALID_AMOUNT", str(exc)))
+        debit_amount = credit_amount = Decimal("0")
+
+    if debit_amount > 0 and credit_amount > 0:
+        result.errors.append(
+            RowError(None, "BOTH_DEBIT_AND_CREDIT", "A row cannot have both a debit and a credit amount")
+        )
+    if debit_amount == 0 and credit_amount == 0:
+        result.errors.append(
+            RowError(None, "MISSING_AMOUNT", "A row must have either a debit or a credit amount")
+        )
+
+    balance_after = None
+    if row.get("balance_after_transaction"):
+        try:
+            balance_after = normalize_amount(row.get("balance_after_transaction"))
+        except NormalizationError as exc:
+            result.errors.append(RowError("balance_after_transaction", "INVALID_AMOUNT", str(exc)))
+
+    if result.errors:
+        return result
+
+    reference_number = normalize_text(row.get("reference_number"))
+    result.normalized = {
+        "transaction_date": transaction_date,
+        "value_date": value_date,
+        "description": description,
+        "reference_number": reference_number,
+        "cheque_number": normalize_text(row.get("cheque_number")),
+        "debit_amount": debit_amount,
+        "credit_amount": credit_amount,
+        "balance_after_transaction": balance_after,
+        "normalized_description": normalize_bank_text(description),
+        "normalized_reference": normalize_bank_text(reference_number),
+    }
+    return result
+
+
 def validate_tds_row(row: dict, ctx: ImportContext) -> RowResult:
     """External/actual TDS data (e.g. from last year's records or a CA's
     working file) being brought in for reconciliation — not something the
@@ -658,6 +731,7 @@ VALIDATORS = {
     ImportType.TALLY: validate_sales_row,
     ImportType.GSTR2B: validate_gstr2b_row,
     ImportType.TDS: validate_tds_row,
+    ImportType.BANK_STATEMENT: validate_bank_statement_row,
 }
 
 

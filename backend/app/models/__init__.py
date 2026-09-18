@@ -1,5 +1,10 @@
 from app.models.accounting_period import AccountingPeriod
 from app.models.audit_log import AuditLog
+from app.models.bank_account import BankAccount
+from app.models.bank_reconciliation import BankReconciliation
+from app.models.bank_statement import BankStatement
+from app.models.bank_transaction import BankTransaction
+from app.models.bank_transaction_match import BankTransactionMatch
 from app.models.company import Company
 from app.models.credit_note import CreditNote, CreditNoteItem
 from app.models.customer import Customer
@@ -42,6 +47,11 @@ from app.models.vendor import Vendor
 __all__ = [
     "AccountingPeriod",
     "AuditLog",
+    "BankAccount",
+    "BankReconciliation",
+    "BankStatement",
+    "BankTransaction",
+    "BankTransactionMatch",
     "Company",
     "CreditNote",
     "CreditNoteItem",

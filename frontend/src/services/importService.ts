@@ -18,6 +18,7 @@ export interface CreateImportJobPayload {
   import_type: ImportType;
   financial_year_id?: string | null;
   return_period_id?: string | null;
+  bank_statement_id?: string | null;
   column_mapping: Record<string, string>;
 }
 

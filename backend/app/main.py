@@ -10,6 +10,12 @@ from sqlalchemy.exc import IntegrityError
 from app.api import (
     accounting_periods,
     auth,
+    bank_accounts,
+    bank_matches,
+    bank_reconciliations,
+    bank_reports,
+    bank_statements,
+    bank_transactions,
     companies,
     credit_notes,
     customers,
@@ -165,3 +171,9 @@ app.include_router(tds_return_periods.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tds_return_snapshots.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tds_review_notes.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tds_reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(bank_accounts.router, prefix=settings.API_V1_PREFIX)
+app.include_router(bank_statements.router, prefix=settings.API_V1_PREFIX)
+app.include_router(bank_transactions.router, prefix=settings.API_V1_PREFIX)
+app.include_router(bank_matches.router, prefix=settings.API_V1_PREFIX)
+app.include_router(bank_reconciliations.router, prefix=settings.API_V1_PREFIX)
+app.include_router(bank_reports.router, prefix=settings.API_V1_PREFIX)

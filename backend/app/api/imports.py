@@ -100,6 +100,8 @@ async def create_import_job(
         await _ensure_permission(db, current_user, membership, PermissionCode.GSTR2B_IMPORT)
     elif payload.import_type == ImportType.TDS:
         await _ensure_permission(db, current_user, membership, PermissionCode.TDS_IMPORT)
+    elif payload.import_type == ImportType.BANK_STATEMENT:
+        await _ensure_permission(db, current_user, membership, PermissionCode.BANK_STATEMENT_IMPORT)
 
     document = await DocumentService(db, storage).get_document(
         company_id=company_id, document_id=payload.document_id
@@ -111,6 +113,7 @@ async def create_import_job(
         import_type=payload.import_type,
         financial_year_id=payload.financial_year_id,
         return_period_id=payload.return_period_id,
+        bank_statement_id=payload.bank_statement_id,
         column_mapping=payload.column_mapping,
         current_user=current_user,
         meta=meta,
@@ -208,6 +211,8 @@ async def commit_import_job(
         await _ensure_permission(db, current_user, membership, PermissionCode.GSTR2B_IMPORT)
     elif existing.import_type == ImportType.TDS:
         await _ensure_permission(db, current_user, membership, PermissionCode.TDS_IMPORT_COMMIT)
+    elif existing.import_type == ImportType.BANK_STATEMENT:
+        await _ensure_permission(db, current_user, membership, PermissionCode.BANK_STATEMENT_IMPORT_COMMIT)
 
     job = await service.commit(company_id, job_id, current_user, meta)
     await db.commit()

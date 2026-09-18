@@ -100,3 +100,27 @@ creating a new deductee or being skipped without explanation.
 Each imported row lands as a `DEDUCTED` `TDSTransaction` directly (this is reconciliation
 import of already-known TDS data, not a calculation request — see PHASE5 section 29), ready
 to allocate against a `TDSChallan` and reconcile.
+
+## Phase 6 — Bank reconciliation walkthrough (`sample_bank_statement.csv`)
+
+The exact scenario from the PHASE6 master prompt (section 54): four transactions on an
+"HDFC Current Account" — a UPI receipt, an NEFT payment, a bank charge, and a second UPI
+receipt. Import type `BANK_STATEMENT` via `Banking → Statements` (register the statement
+first with matching opening/closing balances — ₹100,000 opening, ₹162,500 closing for this
+file — then import its transactions from the statement's row).
+
+To see **automatic matching** find a strong candidate, first create (under `Accounting`)
+a Customer named "ABC Traders" and a Receipt against them dated 2026-09-01 for ₹50,000 with
+reference `UPI900011` and vendor/customer likewise for "XYZ Suppliers" — a Payment dated
+2026-09-02 for ₹12,000 with reference `NEFT700022`. Both share the bank account's own linked
+Ledger as their `ledger_id` (link one when creating the bank account, or matching still works
+without it — only the book-balance comparison needs it). Running `Run matching` on a
+reconciliation session covering this period auto-matches both (exact amount + exact
+reference + exact date clears the strong-match threshold); the ₹500 bank charge and the
+second UPI receipt (no corresponding book entry in this walkthrough) are left `UNMATCHED` —
+the bank charge is a natural candidate for `Create Adjustment`, the second receipt for manual
+matching once its own Receipt exists.
+
+`tests/test_bank_matching.py` in the backend exercises the same auto-match/ambiguous-match/
+partial-match/adjustment scenarios programmatically — if you ever edit the matching engine's
+scoring constants, run that suite to confirm the outcomes still line up.

@@ -11,6 +11,8 @@ from app.models.accounting_enums import (
     ImportType,
     TransactionStatus,
 )
+from app.models.bank_enums import BankStatementStatus, BankTransactionType
+from app.models.bank_transaction import BankTransaction
 from app.models.customer import Customer
 from app.models.gstr2b_record import GSTR2BRecord
 from app.models.import_job import ImportError as ImportErrorModel
@@ -27,6 +29,8 @@ from app.models.tds_enums import PANStatus, TDSApplicabilityStatus, TDSTransacti
 from app.models.tds_transaction import TDSTransaction
 from app.models.user import User
 from app.models.vendor import Vendor
+from app.repositories.bank_statement_repository import BankStatementRepository
+from app.repositories.bank_transaction_repository import BankTransactionRepository
 from app.repositories.deductee_repository import DeducteeRepository
 from app.repositories.financial_year_repository import FinancialYearRepository
 from app.repositories.import_job_repository import ImportJobRepository
@@ -40,6 +44,7 @@ from app.services.imports.column_mapping import apply_mapping, validate_mapping
 from app.services.imports.field_definitions import get_field_definitions
 from app.services.imports.row_validators import ImportContext, validate_row
 from app.storage.base import StorageProvider
+from app.utils.bank_checksum import compute_bank_transaction_checksum
 
 
 class ImportService:
@@ -51,6 +56,8 @@ class ImportService:
         self.purchase_invoices = PurchaseInvoiceRepository(db)
         self.deductees = DeducteeRepository(db)
         self.financial_years = FinancialYearRepository(db)
+        self.bank_statements = BankStatementRepository(db)
+        self.bank_transactions = BankTransactionRepository(db)
         self.audit = AuditService(db)
 
     # ------------------------------------------------------------------
@@ -82,6 +89,7 @@ class ImportService:
         import_type: ImportType,
         financial_year_id: uuid.UUID | None,
         return_period_id: uuid.UUID | None = None,
+        bank_statement_id: uuid.UUID | None = None,
         column_mapping: dict[str, str],
         current_user: User,
         meta: RequestMeta,
@@ -90,6 +98,18 @@ class ImportService:
             raise ValidationAppError(
                 "return_period_id is required for a GSTR-2B import", code="RETURN_PERIOD_REQUIRED"
             )
+
+        bank_account_id: uuid.UUID | None = None
+        if import_type == ImportType.BANK_STATEMENT:
+            if bank_statement_id is None:
+                raise ValidationAppError(
+                    "bank_statement_id is required for a bank statement import",
+                    code="BANK_STATEMENT_REQUIRED",
+                )
+            statement = await self.bank_statements.get_by_id_for_company(bank_statement_id, company_id)
+            if statement is None:
+                raise ValidationAppError("Bank statement not found", code="BANK_STATEMENT_NOT_FOUND")
+            bank_account_id = uuid.UUID(str(statement.bank_account_id))
 
         fields = get_field_definitions(import_type)
         validate_mapping(column_mapping, fields)
@@ -106,6 +126,7 @@ class ImportService:
             document_id=document.id,
             financial_year_id=financial_year_id,
             return_period_id=return_period_id,
+            bank_statement_id=bank_statement_id,
             import_type=import_type,
             status=ImportStatus.VALIDATING,
             column_mapping=column_mapping,
@@ -151,11 +172,23 @@ class ImportService:
                     )
                 continue
 
+            if import_type == ImportType.BANK_STATEMENT:
+                data = result.normalized
+                amount = data["debit_amount"] if data["debit_amount"] > 0 else data["credit_amount"]
+                data["checksum"] = compute_bank_transaction_checksum(
+                    company_id=company_id,
+                    bank_account_id=bank_account_id,
+                    transaction_date=data["transaction_date"],
+                    amount=amount,
+                    reference_number=data["reference_number"],
+                    description=data["description"],
+                )
+
             dup_key = self._duplicate_key(import_type, result.normalized)
             is_duplicate = dup_key is not None and dup_key in seen_keys
             if not is_duplicate and dup_key is not None:
                 is_duplicate = await self._check_existing_duplicate(
-                    import_type, company_id, result.normalized
+                    import_type, company_id, result.normalized, bank_account_id=bank_account_id
                 )
 
             row_status = RowStatus.VALID
@@ -229,11 +262,23 @@ class ImportService:
                 str(normalized.get("transaction_date")),
                 str(normalized.get("gross_amount")),
             )
+        if import_type == ImportType.BANK_STATEMENT:
+            return ("bank_statement", normalized.get("checksum"))
         return None
 
     async def _check_existing_duplicate(
-        self, import_type: ImportType, company_id: uuid.UUID, normalized: dict
+        self,
+        import_type: ImportType,
+        company_id: uuid.UUID,
+        normalized: dict,
+        *,
+        bank_account_id: uuid.UUID | None = None,
     ) -> bool:
+        if import_type == ImportType.BANK_STATEMENT and bank_account_id is not None:
+            existing = await self.bank_transactions.get_by_checksum(
+                company_id, bank_account_id, normalized["checksum"]
+            )
+            return existing is not None
         if import_type in (ImportType.SALES, ImportType.TALLY) and normalized.get("customer_id"):
             existing = await self.sales_invoices.find_duplicate(
                 company_id=company_id,
@@ -323,6 +368,8 @@ class ImportService:
                 await self._commit_gstr2b(company_id, job, valid_rows)
             elif job.import_type == ImportType.TDS:
                 await self._commit_tds(company_id, job, valid_rows)
+            elif job.import_type == ImportType.BANK_STATEMENT:
+                await self._commit_bank_statement(company_id, job, valid_rows)
         except Exception:
             await self.db.rollback()
             job.status = ImportStatus.FAILED
@@ -632,6 +679,45 @@ class ImportService:
             await self.db.flush()
             row.status = RowStatus.COMMITTED
             row.created_record_id = str(transaction.id)
+
+    async def _commit_bank_statement(
+        self, company_id: uuid.UUID, job: ImportJob, rows: list[ImportRow]
+    ) -> None:
+        statement = await self.bank_statements.get_by_id_for_company(job.bank_statement_id, company_id)
+        if statement is None:
+            raise ValidationAppError("Bank statement not found", code="BANK_STATEMENT_NOT_FOUND")
+
+        for row in rows:
+            data = row.normalized_data
+            debit = round_money(_dec(data["debit_amount"]))
+            credit = round_money(_dec(data["credit_amount"]))
+            transaction = BankTransaction(
+                company_id=company_id,
+                bank_statement_id=statement.id,
+                bank_account_id=statement.bank_account_id,
+                transaction_date=_to_date(data["transaction_date"]),
+                value_date=_to_date(data["value_date"]) if data.get("value_date") else None,
+                description=data["description"],
+                reference_number=data.get("reference_number"),
+                cheque_number=data.get("cheque_number"),
+                debit_amount=debit,
+                credit_amount=credit,
+                amount=debit if debit > 0 else credit,
+                balance_after_transaction=round_money(_dec(data["balance_after_transaction"]))
+                if data.get("balance_after_transaction")
+                else None,
+                transaction_type=BankTransactionType.DEBIT if debit > 0 else BankTransactionType.CREDIT,
+                normalized_description=data.get("normalized_description"),
+                normalized_reference=data.get("normalized_reference"),
+                checksum=data["checksum"],
+            )
+            self.db.add(transaction)
+            await self.db.flush()
+            row.status = RowStatus.COMMITTED
+            row.created_record_id = str(transaction.id)
+
+        statement.status = BankStatementStatus.READY
+        await self.db.flush()
 
     async def _commit_gstr2b(
         self, company_id: uuid.UUID, job: ImportJob, rows: list[ImportRow]

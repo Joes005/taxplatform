@@ -43,6 +43,13 @@ import TdsTransactionsPage from "@/pages/tds/TdsTransactionsPage";
 import TdsChallansPage from "@/pages/tds/TdsChallansPage";
 import TdsReturnPeriodDetailPage from "@/pages/tds/TdsReturnPeriodDetailPage";
 
+import BankDashboardPage from "@/pages/bank/BankDashboardPage";
+import BankAccountsPage from "@/pages/bank/BankAccountsPage";
+import BankStatementsPage from "@/pages/bank/BankStatementsPage";
+import BankTransactionsPage from "@/pages/bank/BankTransactionsPage";
+import BankReconciliationsPage from "@/pages/bank/BankReconciliationsPage";
+import BankReconciliationDetailPage from "@/pages/bank/BankReconciliationDetailPage";
+
 export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
@@ -88,6 +95,12 @@ export const router = createBrowserRouter([
           { path: "/tds/transactions", element: <TdsTransactionsPage /> },
           { path: "/tds/challans", element: <TdsChallansPage /> },
           { path: "/tds/return-periods/:periodId", element: <TdsReturnPeriodDetailPage /> },
+          { path: "/bank", element: <BankDashboardPage /> },
+          { path: "/bank/accounts", element: <BankAccountsPage /> },
+          { path: "/bank/statements", element: <BankStatementsPage /> },
+          { path: "/bank/transactions", element: <BankTransactionsPage /> },
+          { path: "/bank/reconciliations", element: <BankReconciliationsPage /> },
+          { path: "/bank/reconciliations/:reconciliationId", element: <BankReconciliationDetailPage /> },
         ],
       },
     ],

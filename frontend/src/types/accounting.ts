@@ -34,7 +34,9 @@ export type ImportType =
   | "LEDGERS"
   | "JOURNALS"
   | "TALLY"
-  | "GSTR2B";
+  | "GSTR2B"
+  | "TDS"
+  | "BANK_STATEMENT";
 export type ImportStatus =
   | "UPLOADED"
   | "PARSING"

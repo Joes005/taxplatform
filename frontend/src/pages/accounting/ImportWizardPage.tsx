@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, UploadCloud, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
 import { useFinancialYears } from "@/hooks/useAccounting";
+import { useBankStatements } from "@/hooks/useBankStatements";
 import { useGstReturnPeriods } from "@/hooks/useGstReturnPeriods";
 import { useCommitImportJob, useImportFields, useImportErrors, useImportPreview } from "@/hooks/useImports";
 import { importService } from "@/services/importService";
@@ -26,6 +27,7 @@ const IMPORT_TYPES: {
   label: string;
   needsFinancialYear: boolean;
   needsReturnPeriod?: boolean;
+  needsBankStatement?: boolean;
 }[] = [
   { value: "CUSTOMERS", label: "Customers", needsFinancialYear: false },
   { value: "VENDORS", label: "Vendors", needsFinancialYear: false },
@@ -38,6 +40,8 @@ const IMPORT_TYPES: {
   { value: "JOURNALS", label: "Journal Entries", needsFinancialYear: true },
   { value: "TALLY", label: "Tally Export (CSV/XLSX)", needsFinancialYear: true },
   { value: "GSTR2B", label: "GSTR-2B (CSV/XLSX/JSON)", needsFinancialYear: false, needsReturnPeriod: true },
+  { value: "TDS", label: "TDS Reconciliation Data (CSV/XLSX)", needsFinancialYear: false },
+  { value: "BANK_STATEMENT", label: "Bank Statement (CSV/XLSX)", needsFinancialYear: false, needsBankStatement: true },
 ];
 
 type WizardStep = "setup" | "mapping" | "result";
@@ -52,11 +56,13 @@ export default function ImportWizardPage() {
 
   const presetImportType = searchParams.get("importType") as ImportType | null;
   const presetReturnPeriodId = searchParams.get("returnPeriodId");
+  const presetBankStatementId = searchParams.get("bankStatementId");
 
   const [step, setStep] = useState<WizardStep>("setup");
   const [importType, setImportType] = useState<ImportType | "">(presetImportType ?? "");
   const [financialYearId, setFinancialYearId] = useState<string>("");
   const [returnPeriodId, setReturnPeriodId] = useState<string>(presetReturnPeriodId ?? "");
+  const [bankStatementId, setBankStatementId] = useState<string>(presetBankStatementId ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
@@ -68,6 +74,7 @@ export default function ImportWizardPage() {
 
   const { data: financialYears } = useFinancialYears(companyId);
   const { data: returnPeriods } = useGstReturnPeriods(companyId);
+  const { data: bankStatements } = useBankStatements(companyId);
   const { data: fieldDefs } = useImportFields((importType || null) as ImportType | null);
   const commitMutation = useCommitImportJob(companyId);
   const { data: jobPreview } = useImportPreview(companyId, jobId ?? undefined);
@@ -106,6 +113,7 @@ export default function ImportWizardPage() {
         import_type: importType,
         financial_year_id: financialYearId || undefined,
         return_period_id: returnPeriodId || undefined,
+        bank_statement_id: bankStatementId || undefined,
         column_mapping: mapping,
       });
       setJobId(job.id);
@@ -189,6 +197,23 @@ export default function ImportWizardPage() {
               </div>
             )}
 
+            {selectedType?.needsBankStatement && (
+              <div className="space-y-1.5">
+                <Label>Bank statement</Label>
+                <Select value={bankStatementId} onValueChange={setBankStatementId}>
+                  <SelectTrigger><SelectValue placeholder="Select a registered statement" /></SelectTrigger>
+                  <SelectContent>
+                    {(bankStatements?.items ?? []).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.statement_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Register the statement first under Banking → Statements, then import its transactions here.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label>File</Label>
               <div
@@ -225,6 +250,7 @@ export default function ImportWizardPage() {
                   !importType ||
                   (selectedType?.needsFinancialYear && !financialYearId) ||
                   (selectedType?.needsReturnPeriod && !returnPeriodId) ||
+                  (selectedType?.needsBankStatement && !bankStatementId) ||
                   isUploading
                 }
                 onClick={handleUploadAndDetectColumns}

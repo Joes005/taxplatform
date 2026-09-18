@@ -15,7 +15,7 @@ const MODULE_PLACEHOLDERS = [
   { title: "Accounting", subtitle: "Available now", icon: Landmark, status: "available" as const, to: "/accounting/dashboard" },
   { title: "GST Compliance", subtitle: "Available now", icon: ShieldCheck, status: "available" as const, to: "/gst" },
   { title: "TDS Compliance", subtitle: "Available now", icon: Calculator, status: "available" as const, to: "/tds" },
-  { title: "Bank Reconciliation", subtitle: "Coming in a future phase", icon: GitMerge, status: "planned" as const, to: null },
+  { title: "Bank Reconciliation", subtitle: "Available now", icon: GitMerge, status: "available" as const, to: "/bank" },
   { title: "Audit", subtitle: "Foundation available", icon: ShieldCheck, status: "available" as const, to: "/audit-logs" },
 ];
 

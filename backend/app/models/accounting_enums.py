@@ -111,6 +111,7 @@ class ImportType(StrEnum):
     TALLY = "TALLY"
     GSTR2B = "GSTR2B"
     TDS = "TDS"
+    BANK_STATEMENT = "BANK_STATEMENT"
 
 
 class ImportStatus(StrEnum):
