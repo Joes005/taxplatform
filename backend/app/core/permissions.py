@@ -170,6 +170,34 @@ class PermissionCode(StrEnum):
     BANK_REPORT_VIEW = "BANK_REPORT_VIEW"
     BANK_REPORT_EXPORT = "BANK_REPORT_EXPORT"
 
+    # --- CA/Auditor Workflow (Phase 7) ---
+    AUDIT_ENGAGEMENT_VIEW = "AUDIT_ENGAGEMENT_VIEW"
+    AUDIT_ENGAGEMENT_CREATE = "AUDIT_ENGAGEMENT_CREATE"
+    AUDIT_ENGAGEMENT_UPDATE = "AUDIT_ENGAGEMENT_UPDATE"
+    AUDIT_ENGAGEMENT_ASSIGN = "AUDIT_ENGAGEMENT_ASSIGN"
+
+    AUDIT_CHECKLIST_VIEW = "AUDIT_CHECKLIST_VIEW"
+    AUDIT_CHECKLIST_MANAGE = "AUDIT_CHECKLIST_MANAGE"
+
+    AUDIT_FINDING_VIEW = "AUDIT_FINDING_VIEW"
+    AUDIT_FINDING_CREATE = "AUDIT_FINDING_CREATE"
+    AUDIT_FINDING_UPDATE = "AUDIT_FINDING_UPDATE"
+    AUDIT_FINDING_ASSIGN = "AUDIT_FINDING_ASSIGN"
+    AUDIT_FINDING_RESPOND = "AUDIT_FINDING_RESPOND"
+    AUDIT_FINDING_REVIEW = "AUDIT_FINDING_REVIEW"
+    AUDIT_FINDING_RESOLVE = "AUDIT_FINDING_RESOLVE"
+    AUDIT_FINDING_REOPEN = "AUDIT_FINDING_REOPEN"
+
+    AUDIT_EVIDENCE_MANAGE = "AUDIT_EVIDENCE_MANAGE"
+
+    AUDIT_ENGAGEMENT_REVIEW = "AUDIT_ENGAGEMENT_REVIEW"
+    AUDIT_ENGAGEMENT_APPROVE = "AUDIT_ENGAGEMENT_APPROVE"
+    AUDIT_ENGAGEMENT_SIGNOFF = "AUDIT_ENGAGEMENT_SIGNOFF"
+    AUDIT_ENGAGEMENT_LOCK = "AUDIT_ENGAGEMENT_LOCK"
+
+    AUDIT_REPORT_VIEW = "AUDIT_REPORT_VIEW"
+    AUDIT_REPORT_EXPORT = "AUDIT_REPORT_EXPORT"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -298,6 +326,27 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.BANK_RECONCILE_LOCK, "BANK", "Lock a reconciled session"),
     (PermissionCode.BANK_REPORT_VIEW, "BANK", "View bank reconciliation reports"),
     (PermissionCode.BANK_REPORT_EXPORT, "BANK", "Export bank reconciliation reports"),
+    (PermissionCode.AUDIT_ENGAGEMENT_VIEW, "AUDIT_WORKFLOW", "View audit engagements"),
+    (PermissionCode.AUDIT_ENGAGEMENT_CREATE, "AUDIT_WORKFLOW", "Create audit engagements"),
+    (PermissionCode.AUDIT_ENGAGEMENT_UPDATE, "AUDIT_WORKFLOW", "Update audit engagements and their status"),
+    (PermissionCode.AUDIT_ENGAGEMENT_ASSIGN, "AUDIT_WORKFLOW", "Assign/unassign users to an engagement"),
+    (PermissionCode.AUDIT_CHECKLIST_VIEW, "AUDIT_WORKFLOW", "View an engagement's checklist"),
+    (PermissionCode.AUDIT_CHECKLIST_MANAGE, "AUDIT_WORKFLOW", "Generate and update checklist items"),
+    (PermissionCode.AUDIT_FINDING_VIEW, "AUDIT_WORKFLOW", "View audit findings"),
+    (PermissionCode.AUDIT_FINDING_CREATE, "AUDIT_WORKFLOW", "Create audit findings"),
+    (PermissionCode.AUDIT_FINDING_UPDATE, "AUDIT_WORKFLOW", "Update findings and add comments"),
+    (PermissionCode.AUDIT_FINDING_ASSIGN, "AUDIT_WORKFLOW", "Assign a finding to a user"),
+    (PermissionCode.AUDIT_FINDING_RESPOND, "AUDIT_WORKFLOW", "Submit a response to an assigned finding"),
+    (PermissionCode.AUDIT_FINDING_REVIEW, "AUDIT_WORKFLOW", "Accept/reject a finding response"),
+    (PermissionCode.AUDIT_FINDING_RESOLVE, "AUDIT_WORKFLOW", "Resolve or close a finding"),
+    (PermissionCode.AUDIT_FINDING_REOPEN, "AUDIT_WORKFLOW", "Reopen a resolved/closed finding"),
+    (PermissionCode.AUDIT_EVIDENCE_MANAGE, "AUDIT_WORKFLOW", "Attach or remove finding evidence"),
+    (PermissionCode.AUDIT_ENGAGEMENT_REVIEW, "AUDIT_WORKFLOW", "Start/complete an engagement review pass"),
+    (PermissionCode.AUDIT_ENGAGEMENT_APPROVE, "AUDIT_WORKFLOW", "Approve an engagement"),
+    (PermissionCode.AUDIT_ENGAGEMENT_SIGNOFF, "AUDIT_WORKFLOW", "Record an internal sign-off"),
+    (PermissionCode.AUDIT_ENGAGEMENT_LOCK, "AUDIT_WORKFLOW", "Close and lock an engagement"),
+    (PermissionCode.AUDIT_REPORT_VIEW, "AUDIT_WORKFLOW", "View audit workflow reports and the review queue"),
+    (PermissionCode.AUDIT_REPORT_EXPORT, "AUDIT_WORKFLOW", "Export audit workflow reports"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -421,6 +470,17 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.BANK_RECONCILE_LOCK,
         PermissionCode.BANK_REPORT_VIEW,
         PermissionCode.BANK_REPORT_EXPORT,
+        PermissionCode.AUDIT_ENGAGEMENT_VIEW,
+        PermissionCode.AUDIT_ENGAGEMENT_CREATE,
+        PermissionCode.AUDIT_ENGAGEMENT_UPDATE,
+        PermissionCode.AUDIT_ENGAGEMENT_ASSIGN,
+        PermissionCode.AUDIT_CHECKLIST_VIEW,
+        PermissionCode.AUDIT_CHECKLIST_MANAGE,
+        PermissionCode.AUDIT_FINDING_VIEW,
+        PermissionCode.AUDIT_FINDING_RESPOND,
+        PermissionCode.AUDIT_EVIDENCE_MANAGE,
+        PermissionCode.AUDIT_REPORT_VIEW,
+        PermissionCode.AUDIT_REPORT_EXPORT,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
@@ -517,6 +577,12 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.BANK_RECONCILE_SUBMIT,
         PermissionCode.BANK_REPORT_VIEW,
         PermissionCode.BANK_REPORT_EXPORT,
+        PermissionCode.AUDIT_ENGAGEMENT_VIEW,
+        PermissionCode.AUDIT_CHECKLIST_VIEW,
+        PermissionCode.AUDIT_FINDING_VIEW,
+        PermissionCode.AUDIT_FINDING_RESPOND,
+        PermissionCode.AUDIT_EVIDENCE_MANAGE,
+        PermissionCode.AUDIT_REPORT_VIEW,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
@@ -560,6 +626,24 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.BANK_RECONCILE_APPROVE,
         PermissionCode.BANK_RECONCILE_LOCK,
         PermissionCode.BANK_REPORT_VIEW,
+        PermissionCode.AUDIT_ENGAGEMENT_VIEW,
+        PermissionCode.AUDIT_ENGAGEMENT_UPDATE,
+        PermissionCode.AUDIT_CHECKLIST_VIEW,
+        PermissionCode.AUDIT_CHECKLIST_MANAGE,
+        PermissionCode.AUDIT_FINDING_VIEW,
+        PermissionCode.AUDIT_FINDING_CREATE,
+        PermissionCode.AUDIT_FINDING_UPDATE,
+        PermissionCode.AUDIT_FINDING_ASSIGN,
+        PermissionCode.AUDIT_FINDING_REVIEW,
+        PermissionCode.AUDIT_FINDING_RESOLVE,
+        PermissionCode.AUDIT_FINDING_REOPEN,
+        PermissionCode.AUDIT_EVIDENCE_MANAGE,
+        PermissionCode.AUDIT_ENGAGEMENT_REVIEW,
+        PermissionCode.AUDIT_ENGAGEMENT_APPROVE,
+        PermissionCode.AUDIT_ENGAGEMENT_SIGNOFF,
+        PermissionCode.AUDIT_ENGAGEMENT_LOCK,
+        PermissionCode.AUDIT_REPORT_VIEW,
+        PermissionCode.AUDIT_REPORT_EXPORT,
     ],
 }
 

@@ -50,6 +50,11 @@ import BankTransactionsPage from "@/pages/bank/BankTransactionsPage";
 import BankReconciliationsPage from "@/pages/bank/BankReconciliationsPage";
 import BankReconciliationDetailPage from "@/pages/bank/BankReconciliationDetailPage";
 
+import AuditDashboardPage from "@/pages/audit/AuditDashboardPage";
+import AuditEngagementsPage from "@/pages/audit/AuditEngagementsPage";
+import AuditEngagementDetailPage from "@/pages/audit/AuditEngagementDetailPage";
+import AuditFindingDetailPage from "@/pages/audit/AuditFindingDetailPage";
+
 export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
@@ -101,6 +106,10 @@ export const router = createBrowserRouter([
           { path: "/bank/transactions", element: <BankTransactionsPage /> },
           { path: "/bank/reconciliations", element: <BankReconciliationsPage /> },
           { path: "/bank/reconciliations/:reconciliationId", element: <BankReconciliationDetailPage /> },
+          { path: "/audits", element: <AuditDashboardPage /> },
+          { path: "/audits/engagements", element: <AuditEngagementsPage /> },
+          { path: "/audits/engagements/:engagementId", element: <AuditEngagementDetailPage /> },
+          { path: "/audits/findings/:findingId", element: <AuditFindingDetailPage /> },
         ],
       },
     ],

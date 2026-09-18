@@ -9,6 +9,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api import (
     accounting_periods,
+    audit_checklists,
+    audit_engagements,
+    audit_findings,
+    audit_reports,
+    audit_reviews,
     auth,
     bank_accounts,
     bank_matches,
@@ -177,3 +182,8 @@ app.include_router(bank_transactions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(bank_matches.router, prefix=settings.API_V1_PREFIX)
 app.include_router(bank_reconciliations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(bank_reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(audit_engagements.router, prefix=settings.API_V1_PREFIX)
+app.include_router(audit_checklists.router, prefix=settings.API_V1_PREFIX)
+app.include_router(audit_findings.router, prefix=settings.API_V1_PREFIX)
+app.include_router(audit_reviews.router, prefix=settings.API_V1_PREFIX)
+app.include_router(audit_reports.router, prefix=settings.API_V1_PREFIX)

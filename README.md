@@ -6,6 +6,7 @@
 **Phase 4 — GST Compliance Engine (GSTR-1, GSTR-2B Reconciliation, ITC, GSTR-3B)**
 **Phase 5 — TDS Compliance Engine (Deductees, Rule Engine, Challans, Reconciliation, Returns)**
 **Phase 6 — Bank Reconciliation Engine (Statement Import, Matching, Review Workflow)**
+**Phase 7 — CA/Auditor Workflow (Engagements, Findings, Evidence, Review, Sign-off)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -25,7 +26,13 @@ the same accounting layer — bank statement import with checksum-based duplicat
 a deterministic (no-AI) point-scored matching engine against existing Payments/Receipts/
 Journal Entries, manual and partial matching with over-allocation guards, adjustment journal
 entries for bank charges/interest, and a full reconciliation session review workflow — all
-for a CA/auditor to review before anything is filed or acted on elsewhere.
+for a CA/auditor to review before anything is filed or acted on elsewhere. Phase 7 builds a
+CA/Auditor workflow layer on top of every prior phase — review engagements with a controlled
+lifecycle, an assignable team, a standard (editable) checklist, findings that reference any
+prior-phase record without duplicating it, an evidence trail that reuses Phase 2's document
+store, a formal response/review cycle, and an internal review + sign-off trail — so a review
+of this company's data has one shared, auditable home instead of being tracked in someone's
+inbox or spreadsheet.
 
 > **Scope note:** GST/TDS/Income Tax *filing*, live Tally API integration, OCR/AI
 > extraction, and government portal integration are intentionally **not implemented**.
@@ -35,7 +42,12 @@ for a CA/auditor to review before anything is filed or acted on elsewhere.
 > government service, file 24Q/26Q/27Q/27EQ, or pay a TDS challan. Phase 6 specifically does
 > **not**: connect to any bank (no Open Banking, OAuth, or bank API), fetch live transactions,
 > or use AI/ML for matching — it is entirely file-import-based and every match is either a
-> deterministic point-score result or an explicit human choice. All three only prepare,
+> deterministic point-score result or an explicit human choice. Phase 7 specifically does
+> **not**: use AI/LLM classification for anything, auto-label a finding "fraud" or "illegal"
+> (severity is an internal workflow classification only — `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` —
+> never a legal determination), or let a sign-off claim to be a DSC, ICAI, or statutory
+> certification — every sign-off statement is a fixed, neutral, internal-acknowledgement
+> sentence the service layer controls, never freely authored text. All four only prepare,
 > calculate, validate, reconcile, and export data locally so a human files or acts on it
 > elsewhere. Where the platform anticipates a not-yet-built integration (e.g. structural-only
 > PAN/TAN validation, or bank statement import — CSV/XLSX only today through the same
@@ -327,7 +339,9 @@ tax-compliance-platform/
 │   │                               GSTR-2B import, reconciliation, ITC, GSTR-3B, return
 │   │                               workflow, exports, sample data, TDS foundation, TDS
 │   │                               engine, TDS transactions, TDS challans, TDS
-│   │                               reconciliation, TDS import, TDS return workflow)
+│   │                               reconciliation, TDS import, TDS return workflow, bank
+│   │                               accounts/statements/matching/reconciliation/reports,
+│   │                               audit workflow)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -340,11 +354,16 @@ tax-compliance-platform/
 │   │   │                           period detail with GSTR-1/GSTR-2B/Reconciliation/ITC/
 │   │   │                           GSTR-3B tabs), tds (dashboard, deductees, transactions,
 │   │   │                           challans, return period detail with Overview/Sections/
-│   │   │                           Deductees/Challans/Reconciliation/Review Notes tabs)
+│   │   │                           Deductees/Challans/Reconciliation/Review Notes tabs),
+│   │   │                           bank (dashboard, accounts, statements, transactions,
+│   │   │                           reconciliations, reconciliation detail), audit (dashboard,
+│   │   │                           engagements list, engagement detail with Overview/
+│   │   │                           Checklist/Findings/Review & Sign-off tabs, finding detail)
 │   │   ├── services/                thin fetch wrappers per resource
 │   │   ├── hooks/                   useAuth, useToast, TanStack Query hooks (hierarchical
-│   │   │                           query keys — see §20)
-│   │   ├── types/                   API response types (api.ts + accounting.ts + gst.ts + tds.ts)
+│   │   │                           query keys — see §22)
+│   │   ├── types/                   API response types (api.ts + accounting.ts + gst.ts +
+│   │   │                           tds.ts + bank.ts + audit.ts)
 │   │   ├── lib/                     api-client (fetch + refresh + upload/downloadBlob), token/session storage, utils
 │   │   └── router/                  route table + ProtectedRoute
 │   └── Dockerfile
@@ -481,6 +500,16 @@ detection at the database layer, not just in the import pipeline); a second adds
 `BANK_STATEMENT` import type itself needed no migration — like `TDS` before it, `ImportType`
 is a non-native enum stored as plain `VARCHAR`. No Phase 1–5 table is altered beyond that one
 additive column.
+
+Phase 7 adds one migration creating `audit_engagements`, `audit_assignments`,
+`audit_checklists`, `audit_checklist_items`, `audit_findings`, `audit_finding_comments`,
+`audit_finding_evidence`, `audit_finding_responses`, `audit_reviews`, and `audit_signoffs` —
+all `company_id`-indexed, plus a unique `(company_id, engagement_code)` index on
+`audit_engagements`, a unique `(engagement_id, finding_code)` index on `audit_findings`, a
+`(source_type, source_id)` index on `audit_findings` for reverse lookups, and a **partial
+unique index** on `audit_assignments` enforcing one active `(engagement_id, user_id, role)`
+assignment at a time (`WHERE is_active = true`, the same pattern Phase 1 already uses for
+active company memberships). No Phase 1–6 table is altered.
 
 ## 9. Seed Data
 
@@ -655,8 +684,17 @@ Coverage includes:
   the account has no linked ledger
 - **Bank reports:** the unmatched-bank-transactions and matching-report endpoints returning
   correct rows for a known scenario; a successful CSV export
+- **Audit workflow (Phase 7):** the full engagement lifecycle (`open → assign → start-review →
+  submit-for-review → approve → sign-off → close → lock`), including the "approve is blocked
+  while a HIGH/CRITICAL finding is still open" guard and the "sign-off requires a recorded
+  lead-auditor sign-off first" guard; assignment requiring an active company membership and
+  rejecting a duplicate active assignment; checklist seeding from the standard template and
+  item status updates; finding creation surfacing (never blocking on) a duplicate-open-finding
+  warning for the same source record; the response → review → accept/resolve cycle; evidence
+  reusing an existing Phase 2 document by id; reject/reopen transitions; RBAC (an Accountant
+  cannot create or approve an engagement); tenant isolation on engagement access
 
-As of Phase 6, the full suite is **264 tests**, all passing against a real PostgreSQL
+As of Phase 7, the full suite is **279 tests**, all passing against a real PostgreSQL
 database.
 
 ## 13. API Documentation
@@ -968,11 +1006,76 @@ change was a nullable `return_period_id` on `ImportJob`, mirroring how `financia
 already works for accounting imports. No new upload/preview/commit endpoints were needed;
 the existing generic `/accounting/imports/*` routes already parametrize on `import_type`.
 
-## 20. Future Module Roadmap
+## 20. CA/Auditor Workflow Explanation (Phase 7)
+
+Phase 7 is a **workflow and traceability** layer on top of every prior phase — it never
+files, certifies, or legally opines on anything, and it never duplicates a record another
+phase already owns.
+
+```
+Engagement (DRAFT → OPEN → ASSIGNED → IN_REVIEW ⇄ PENDING_CLIENT_ACTION)
+   → PENDING_AUDITOR_REVIEW → APPROVED → SIGNED_OFF → CLOSED (→ locked)
+   → Checklist (seeded from a small, documented, non-authoritative template)
+   → Findings (generic source_type/source_id reference into any prior phase)
+        → Evidence (links an existing Phase 2 Document — never a 2nd file store)
+        → Comments (append-only)
+        → Response → Review (accept → resolved / reject → action required)
+   → Review passes (initial/final/second/quality — free-form notes, never a status driver)
+   → Sign-off (fixed, neutral, internal-acknowledgement statement only)
+```
+
+**"Audit" means two different things in this codebase, and they're kept deliberately
+separate.** The platform-wide security audit trail (`AuditLog`/`AuditAction`, Phase 1) logs
+*who did what, when* across every module — Phase 7 extends its `AuditAction` catalogue with
+its own action constants rather than building a second logging mechanism. The new
+CA/Auditor *workflow* domain — engagements, findings, evidence, sign-off — lives entirely in
+its own `audit_workflow_enums.py`/`AuditEngagement`/`AuditFinding`/... models, its own
+`/audits/...` route prefix (distinct from the existing `/audit-logs`), and is never
+conflated with the security log it also happens to write to.
+
+**Approval is a checkpoint, not a formality.** `AuditEngagementService._check_can_approve()`
+blocks the `approve` transition while any `HIGH`/`CRITICAL` finding is still open (not
+`RESOLVED`/`CLOSED`/`REJECTED`) or any checklist item is still `REQUIRES_ATTENTION` — the
+same "flag and block, never silently proceed" principle GST/TDS/Bank use for reconciliation
+mismatches. Marking an engagement `SIGNED_OFF` is blocked, in turn, until at least one
+`LEAD_AUDITOR` sign-off has actually been recorded, so the terminal status can never be
+reached by a route call alone.
+
+**A finding's severity is an internal triage label, never a legal claim.** `AuditFinding`'s
+`severity` is `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` and its `category` is a neutral bucket
+(`ACCOUNTING`/`GST`/`TDS`/`BANK`/`DOCUMENT`/`DATA_QUALITY`/`CONTROL`/`COMPLIANCE`/`PROCESS`/
+`OTHER`) — there is no "FRAUD" or "ILLEGAL" value anywhere in the schema, and nothing in the
+service layer infers one. `resolution_summary` and comments are the only free-text fields
+a human ever fills in, and even the sign-off `statement` is a fixed sentence chosen by
+`sign_off_type`, assembled by `AuditSignOffService`, never accepted as request input — so
+the platform cannot be made to emit a "legally certified" or DSC-equivalent claim.
+
+**Findings reference other phases; they never copy them.** `AuditFinding.source_type`/
+`source_id` is the same generic-reference shape `TDSTransaction.source_type`/`source_id` and
+`BankTransactionMatch.source_type`/`source_id` already use — a finding can point at a sales
+invoice, a GST return period, a TDS challan, a bank transaction, or a document without a hard
+FK into five different tables. Creating a second open finding against the same source record
+in the same engagement doesn't fail — `AuditFindingRepository.find_potential_duplicates()`
+surfaces it as a warning (`duplicate_warning`/`duplicate_finding_codes` in the create
+response) so a reviewer can decide whether it's a genuine second issue or a duplicate.
+
+**Evidence reuses Phase 2's document store outright.** `AuditFindingEvidence` is a thin join
+row — `finding_id` + `document_id` + an optional description — over the existing `Document`
+table; the physical file is never re-uploaded or copied, and the service layer validates the
+document belongs to the same company before linking it. This was chosen over extending the
+existing generic `DocumentLink` table specifically because Phase 7 needed a per-evidence
+`description` field `DocumentLink` doesn't carry.
+
+**Assignment never creates a new kind of user.** `AuditAssignmentService.assign()` requires
+an active `CompanyMembership` for the engagement's company before it will create an
+`AuditAssignment` row — the existing RBAC roles (Company Admin/Accountant/Auditor) and
+membership system are the only source of "who can be put on this engagement," never a
+parallel identity concept.
+
+## 21. Future Module Roadmap
 
 These remain route-namespace placeholders only, ready for a future module to fill in
-without touching Phases 1–6 (`/income-tax`, `/audit`, `/compliance`, `/tally`,
-`/integrations`):
+without touching Phases 1–7 (`/income-tax`, `/compliance`, `/tally`, `/integrations`):
 
 | Phase | Module |
 |---|---|
@@ -982,6 +1085,7 @@ without touching Phases 1–6 (`/income-tax`, `/audit`, `/compliance`, `/tally`,
 | 4 | GST Compliance — GSTR-1, GSTR-2B reconciliation, ITC, GSTR-3B *(done — no portal filing)* |
 | 5 | TDS Compliance — deductees, rule engine, transactions, challans, reconciliation, quarterly returns *(done — no TRACES/portal filing)* |
 | 6 | Bank Reconciliation — statement import, deterministic matching engine, manual/partial matching, adjustments, review workflow *(done — no live bank connection, no AI)* |
+| 7 | CA/Auditor Workflow — engagements, assignments, checklist, findings, evidence, response/review, sign-off *(done — no AI, no statutory certification)* |
 | — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter`/`OpenBankingProvider` for an eventual real filing/bank-feed integration, Compliance calendar, live Tally API integration |
 
 Each future module is expected to live in its own `models/ schemas/ services/
@@ -993,7 +1097,7 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
 
 ---
 
-## 21. Key Architectural Decisions
+## 22. Key Architectural Decisions
 
 - **Modular monolith, not microservices.** One deployable backend, cleanly layered, so
   future modules are new packages inside `app/`, not new services to operate.
@@ -1116,10 +1220,25 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
   workflows already use for `GSTReturnSnapshot`/`TDSReturnSnapshot`; an unlisted transition
   (e.g. submitting a `LOCKED` session) is refused by construction rather than by remembering
   to add a check.
+- **The CA/Auditor workflow domain is named and routed to never collide with the
+  pre-existing security audit trail** (Phase 7) — `audit_workflow_enums.py`,
+  `AuditEngagement`/`AuditFinding`/..., and the `/audits/...` prefix are all distinct from
+  the Phase 1 `AuditLog`/`AuditAction`/`/audit-logs` it extends rather than duplicates, so
+  "who did what" logging and "what does this engagement's review look like" stay two
+  separate concerns that happen to share an English word.
+- **`AuditFindingEvidence` links an existing `Document`, it never re-stores a file** (Phase
+  7) — the same "reuse, don't duplicate" instinct Phase 5 applied to `Deductee`/Vendor and
+  Phase 6 applied to journal entries; the only new data is the join row plus an optional
+  description, so there is exactly one place a file's bytes ever live.
+- **Approval and sign-off are gated by explicit, queryable checks, not left to reviewer
+  memory** (Phase 7) — `_check_can_approve()` and the lead-auditor-sign-off check both run
+  inside the same transition path every other action goes through, so "did anyone check for
+  open critical findings before approving" is a guarantee the code makes, not a step a busy
+  reviewer might skip.
 
 ---
 
-## 22. Security Notes
+## 23. Security Notes
 
 - Passwords are hashed with **Argon2id** (`argon2-cffi`), never stored or logged in
   plaintext.

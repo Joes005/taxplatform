@@ -124,3 +124,42 @@ matching once its own Receipt exists.
 `tests/test_bank_matching.py` in the backend exercises the same auto-match/ambiguous-match/
 partial-match/adjustment scenarios programmatically — if you ever edit the matching engine's
 scoring constants, run that suite to confirm the outcomes still line up.
+
+## Phase 7 — Audit workflow walkthrough (no import file — created through the API/UI)
+
+Engagements and findings aren't file-imported (there's nothing to reconcile against an
+external statement), so this walkthrough is a short script instead of a CSV: create one
+engagement for "ABC Traders Pvt Ltd" — the same fictional company the Phase 6 walkthrough
+above uses — and three findings that show each of a finding's three outcomes.
+
+1. Under `Audit Workflow → Engagements`, create an engagement titled "FY 2025-26 Compliance
+   Review" (type `TAX_COMPLIANCE_REVIEW`, period = the financial year), then `Open` it and
+   assign yourself as `LEAD_AUDITOR`. This moves the engagement from `DRAFT` → `OPEN` →
+   `ASSIGNED` automatically once the first assignment lands.
+2. Open the `Checklist` tab — it seeds the standard 11-item template
+   (`app/services/audit_checklist_templates.py`) on first view. Mark a couple of items
+   `COMPLETED` to see engagement-progress numbers move on the Overview tab.
+3. On the `Findings` tab, create three findings:
+   - **F-001** — category `BANK`, severity `MEDIUM`, title "Unmatched UPI receipt on HDFC
+     Current Account", pointing `source_type=BANK_TRANSACTION` at the second UPI receipt
+     left `UNMATCHED` in the Phase 6 walkthrough above. Submit a response, then accept it —
+     the finding moves `ASSIGNED → RESPONSE_SUBMITTED → RESOLVED` and its
+     `resolution_summary` is filled from the accepted response automatically.
+   - **F-002** — category `TDS`, severity `HIGH`, title "TDS deducted but challan not yet
+     deposited". Leave it `OPEN`: with a `HIGH`-severity finding still open, try `Approve` on
+     the Overview tab and confirm it's blocked with
+     `AUDIT_ENGAGEMENT_OPEN_FINDINGS_BLOCK_APPROVAL` — then `Resolve` it with a summary and
+     approval succeeds.
+   - **F-003** — category `ACCOUNTING`, severity `LOW`, title "Round-figure journal entry near
+     period end". `Reject` it with a reason ("reviewed, a legitimate rounding adjustment"),
+     then `Reopen` it to see the append-only comment trail and status history survive a full
+     reject → reopen cycle.
+4. Back on the Overview tab, `Submit for Review`, then `Approve` once F-002 is resolved. On
+   the `Review & Sign-off` tab, record a `LEAD_AUDITOR` sign-off — notice its `statement` is
+   a fixed, neutral sentence you never typed yourself — then `Mark Signed Off` and `Close`.
+   `Lock` is available once closed; a locked engagement rejects further edits with
+   `AUDIT_ENGAGEMENT_LOCKED`.
+
+`tests/test_audit_workflow.py` in the backend exercises this same lifecycle end-to-end
+(including both blocking guards above) — run it after any change to the engagement or
+finding transition tables to confirm the outcomes still line up.

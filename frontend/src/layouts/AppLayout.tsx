@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   CalendarRange,
+  ClipboardCheck,
   FileText,
   Gauge,
   LayoutDashboard,
@@ -76,6 +77,11 @@ const BANK_NAV_ITEMS = [
   { to: "/bank/statements", label: "Statements", icon: ScrollText },
   { to: "/bank/transactions", label: "Transactions", icon: Receipt },
   { to: "/bank/reconciliations", label: "Reconciliation", icon: GitMerge },
+];
+
+const AUDIT_NAV_ITEMS = [
+  { to: "/audits", label: "Dashboard", icon: ClipboardCheck },
+  { to: "/audits/engagements", label: "Engagements", icon: ClipboardCheck },
 ];
 
 export function AppLayout() {
@@ -191,9 +197,30 @@ export function AppLayout() {
               {item.label}
             </NavLink>
           ))}
+          <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Audit Workflow
+          </p>
+          {AUDIT_NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/audits"}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )
+              }
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         <div className="border-t border-border p-3 text-xs text-muted-foreground">
-          Phase 6 · Bank Reconciliation Engine
+          Phase 7 · CA/Auditor Workflow
         </div>
       </aside>
 

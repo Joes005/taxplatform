@@ -1,5 +1,14 @@
 from app.models.accounting_period import AccountingPeriod
+from app.models.audit_assignment import AuditAssignment
+from app.models.audit_checklist import AuditChecklist, AuditChecklistItem
+from app.models.audit_engagement import AuditEngagement
+from app.models.audit_finding import AuditFinding
+from app.models.audit_finding_comment import AuditFindingComment
+from app.models.audit_finding_evidence import AuditFindingEvidence
+from app.models.audit_finding_response import AuditFindingResponse
 from app.models.audit_log import AuditLog
+from app.models.audit_review import AuditReview
+from app.models.audit_signoff import AuditSignOff
 from app.models.bank_account import BankAccount
 from app.models.bank_reconciliation import BankReconciliation
 from app.models.bank_statement import BankStatement
@@ -46,7 +55,17 @@ from app.models.vendor import Vendor
 
 __all__ = [
     "AccountingPeriod",
+    "AuditAssignment",
+    "AuditChecklist",
+    "AuditChecklistItem",
+    "AuditEngagement",
+    "AuditFinding",
+    "AuditFindingComment",
+    "AuditFindingEvidence",
+    "AuditFindingResponse",
     "AuditLog",
+    "AuditReview",
+    "AuditSignOff",
     "BankAccount",
     "BankReconciliation",
     "BankStatement",
