@@ -209,6 +209,23 @@ class PermissionCode(StrEnum):
     INCOME_TAX_LOCK = "INCOME_TAX_LOCK"
     INCOME_TAX_EXPORT = "INCOME_TAX_EXPORT"
 
+    # --- Compliance Calendar / Tasks / Notifications (Phase 9) ---
+    COMPLIANCE_VIEW = "COMPLIANCE_VIEW"
+    COMPLIANCE_TASK_CREATE = "COMPLIANCE_TASK_CREATE"
+    COMPLIANCE_TASK_UPDATE = "COMPLIANCE_TASK_UPDATE"
+    COMPLIANCE_TASK_ASSIGN = "COMPLIANCE_TASK_ASSIGN"
+    COMPLIANCE_TASK_COMPLETE = "COMPLIANCE_TASK_COMPLETE"
+    COMPLIANCE_TASK_REVIEW = "COMPLIANCE_TASK_REVIEW"
+    COMPLIANCE_TASK_VERIFY = "COMPLIANCE_TASK_VERIFY"
+    COMPLIANCE_TASK_CANCEL = "COMPLIANCE_TASK_CANCEL"
+    COMPLIANCE_TASK_LOCK = "COMPLIANCE_TASK_LOCK"
+    COMPLIANCE_OBLIGATION_MANAGE = "COMPLIANCE_OBLIGATION_MANAGE"
+    COMPLIANCE_RULE_MANAGE = "COMPLIANCE_RULE_MANAGE"
+    COMPLIANCE_CALENDAR_VIEW = "COMPLIANCE_CALENDAR_VIEW"
+    COMPLIANCE_NOTIFICATION_VIEW = "COMPLIANCE_NOTIFICATION_VIEW"
+    COMPLIANCE_NOTIFICATION_MANAGE = "COMPLIANCE_NOTIFICATION_MANAGE"
+    COMPLIANCE_REPORT_EXPORT = "COMPLIANCE_REPORT_EXPORT"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -367,6 +384,21 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.INCOME_TAX_APPROVE, "INCOME_TAX", "Approve a tax computation or ITR preparation"),
     (PermissionCode.INCOME_TAX_LOCK, "INCOME_TAX", "Lock an approved tax computation or ITR preparation"),
     (PermissionCode.INCOME_TAX_EXPORT, "INCOME_TAX", "Export Income Tax reports"),
+    (PermissionCode.COMPLIANCE_VIEW, "COMPLIANCE", "View compliance obligations, tasks, and the calendar"),
+    (PermissionCode.COMPLIANCE_TASK_CREATE, "COMPLIANCE", "Create compliance tasks"),
+    (PermissionCode.COMPLIANCE_TASK_UPDATE, "COMPLIANCE", "Update compliance tasks, start work, add comments/evidence"),
+    (PermissionCode.COMPLIANCE_TASK_ASSIGN, "COMPLIANCE", "Assign/reassign a compliance task"),
+    (PermissionCode.COMPLIANCE_TASK_COMPLETE, "COMPLIANCE", "Submit a compliance task for review or mark it complete"),
+    (PermissionCode.COMPLIANCE_TASK_REVIEW, "COMPLIANCE", "Return a compliance task for changes after review"),
+    (PermissionCode.COMPLIANCE_TASK_VERIFY, "COMPLIANCE", "Verify a completed compliance task"),
+    (PermissionCode.COMPLIANCE_TASK_CANCEL, "COMPLIANCE", "Cancel a compliance task"),
+    (PermissionCode.COMPLIANCE_TASK_LOCK, "COMPLIANCE", "Lock a verified/completed compliance task"),
+    (PermissionCode.COMPLIANCE_OBLIGATION_MANAGE, "COMPLIANCE", "Create/update compliance obligations and generate tasks from them"),
+    (PermissionCode.COMPLIANCE_RULE_MANAGE, "COMPLIANCE", "Create/update/activate/deactivate compliance rules"),
+    (PermissionCode.COMPLIANCE_CALENDAR_VIEW, "COMPLIANCE", "View the compliance calendar"),
+    (PermissionCode.COMPLIANCE_NOTIFICATION_VIEW, "COMPLIANCE", "View own in-app notifications"),
+    (PermissionCode.COMPLIANCE_NOTIFICATION_MANAGE, "COMPLIANCE", "Mark own notifications as read"),
+    (PermissionCode.COMPLIANCE_REPORT_EXPORT, "COMPLIANCE", "Export compliance reports"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -508,6 +540,18 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.INCOME_TAX_VALIDATE,
         PermissionCode.INCOME_TAX_REVIEW,
         PermissionCode.INCOME_TAX_EXPORT,
+        PermissionCode.COMPLIANCE_VIEW,
+        PermissionCode.COMPLIANCE_TASK_CREATE,
+        PermissionCode.COMPLIANCE_TASK_UPDATE,
+        PermissionCode.COMPLIANCE_TASK_ASSIGN,
+        PermissionCode.COMPLIANCE_TASK_COMPLETE,
+        PermissionCode.COMPLIANCE_TASK_CANCEL,
+        PermissionCode.COMPLIANCE_OBLIGATION_MANAGE,
+        PermissionCode.COMPLIANCE_RULE_MANAGE,
+        PermissionCode.COMPLIANCE_CALENDAR_VIEW,
+        PermissionCode.COMPLIANCE_NOTIFICATION_VIEW,
+        PermissionCode.COMPLIANCE_NOTIFICATION_MANAGE,
+        PermissionCode.COMPLIANCE_REPORT_EXPORT,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
@@ -617,6 +661,14 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.INCOME_TAX_VALIDATE,
         PermissionCode.INCOME_TAX_REVIEW,
         PermissionCode.INCOME_TAX_EXPORT,
+        PermissionCode.COMPLIANCE_VIEW,
+        PermissionCode.COMPLIANCE_TASK_CREATE,
+        PermissionCode.COMPLIANCE_TASK_UPDATE,
+        PermissionCode.COMPLIANCE_TASK_COMPLETE,
+        PermissionCode.COMPLIANCE_CALENDAR_VIEW,
+        PermissionCode.COMPLIANCE_NOTIFICATION_VIEW,
+        PermissionCode.COMPLIANCE_NOTIFICATION_MANAGE,
+        PermissionCode.COMPLIANCE_REPORT_EXPORT,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
@@ -682,6 +734,14 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.INCOME_TAX_APPROVE,
         PermissionCode.INCOME_TAX_LOCK,
         PermissionCode.INCOME_TAX_EXPORT,
+        PermissionCode.COMPLIANCE_VIEW,
+        PermissionCode.COMPLIANCE_TASK_REVIEW,
+        PermissionCode.COMPLIANCE_TASK_VERIFY,
+        PermissionCode.COMPLIANCE_TASK_LOCK,
+        PermissionCode.COMPLIANCE_CALENDAR_VIEW,
+        PermissionCode.COMPLIANCE_NOTIFICATION_VIEW,
+        PermissionCode.COMPLIANCE_NOTIFICATION_MANAGE,
+        PermissionCode.COMPLIANCE_REPORT_EXPORT,
     ],
 }
 

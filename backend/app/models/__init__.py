@@ -15,6 +15,9 @@ from app.models.bank_statement import BankStatement
 from app.models.bank_transaction import BankTransaction
 from app.models.bank_transaction_match import BankTransactionMatch
 from app.models.company import Company
+from app.models.compliance_obligation import ComplianceObligation
+from app.models.compliance_rule import ComplianceRule
+from app.models.compliance_task import ComplianceTask, ComplianceTaskComment, ComplianceTaskEvidence
 from app.models.credit_note import CreditNote, CreditNoteItem
 from app.models.customer import Customer
 from app.models.debit_note import DebitNote, DebitNoteItem
@@ -54,6 +57,7 @@ from app.models.itr_preparation import ITRPreparation
 from app.models.journal_entry import JournalEntry, JournalEntryLine
 from app.models.ledger import Ledger
 from app.models.membership import CompanyMembership, MembershipStatus
+from app.models.notification import Notification
 from app.models.opening_balance import OpeningBalance
 from app.models.payment import Payment
 from app.models.permission import Permission, RolePermission
@@ -95,6 +99,11 @@ __all__ = [
     "BankTransaction",
     "BankTransactionMatch",
     "Company",
+    "ComplianceObligation",
+    "ComplianceRule",
+    "ComplianceTask",
+    "ComplianceTaskComment",
+    "ComplianceTaskEvidence",
     "CreditNote",
     "CreditNoteItem",
     "Customer",
@@ -141,6 +150,7 @@ __all__ = [
     "JournalEntryLine",
     "Ledger",
     "MembershipStatus",
+    "Notification",
     "OpeningBalance",
     "Payment",
     "Permission",

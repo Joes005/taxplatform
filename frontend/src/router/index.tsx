@@ -64,6 +64,12 @@ import TaxPaymentsPage from "@/pages/income-tax/TaxPaymentsPage";
 import TaxComputationsPage from "@/pages/income-tax/TaxComputationsPage";
 import TaxComputationDetailPage from "@/pages/income-tax/TaxComputationDetailPage";
 
+import ComplianceDashboardPage from "@/pages/compliance/ComplianceDashboardPage";
+import ComplianceCalendarPage from "@/pages/compliance/ComplianceCalendarPage";
+import ComplianceTasksPage from "@/pages/compliance/ComplianceTasksPage";
+import ComplianceTaskDetailPage from "@/pages/compliance/ComplianceTaskDetailPage";
+import NotificationsPage from "@/pages/compliance/NotificationsPage";
+
 export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
@@ -127,6 +133,11 @@ export const router = createBrowserRouter([
           { path: "/income-tax/payments", element: <TaxPaymentsPage /> },
           { path: "/income-tax/computations", element: <TaxComputationsPage /> },
           { path: "/income-tax/computations/:computationId", element: <TaxComputationDetailPage /> },
+          { path: "/compliance", element: <ComplianceDashboardPage /> },
+          { path: "/compliance/calendar", element: <ComplianceCalendarPage /> },
+          { path: "/compliance/tasks", element: <ComplianceTasksPage /> },
+          { path: "/compliance/tasks/:taskId", element: <ComplianceTaskDetailPage /> },
+          { path: "/notifications", element: <NotificationsPage /> },
         ],
       },
     ],

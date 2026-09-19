@@ -22,6 +22,11 @@ from app.api import (
     bank_statements,
     bank_transactions,
     companies,
+    compliance_calendar,
+    compliance_obligations,
+    compliance_reports,
+    compliance_rules,
+    compliance_tasks,
     credit_notes,
     customers,
     debit_notes,
@@ -50,6 +55,7 @@ from app.api import (
     itr_preparations,
     journal_entries,
     ledgers,
+    notifications,
     opening_balances,
     payments,
     products,
@@ -205,3 +211,9 @@ app.include_router(income_tax_payments.router, prefix=settings.API_V1_PREFIX)
 app.include_router(income_tax_computations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(itr_preparations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(income_tax_reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(compliance_rules.router, prefix=settings.API_V1_PREFIX)
+app.include_router(compliance_obligations.router, prefix=settings.API_V1_PREFIX)
+app.include_router(compliance_tasks.router, prefix=settings.API_V1_PREFIX)
+app.include_router(compliance_calendar.router, prefix=settings.API_V1_PREFIX)
+app.include_router(compliance_reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)

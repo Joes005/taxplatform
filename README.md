@@ -8,6 +8,7 @@
 **Phase 6 — Bank Reconciliation Engine (Statement Import, Matching, Review Workflow)**
 **Phase 7 — CA/Auditor Workflow (Engagements, Findings, Evidence, Review, Sign-off)**
 **Phase 8 — Income Tax Compliance Engine (Computation, Tax Credits, ITR Preparation, Validation)**
+**Phase 9 — Compliance Calendar & Task Management (Obligations, Tasks, Notifications)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -40,7 +41,14 @@ property/capital-gains/other-source income entry, business income derived straig
 Phase 3 accounting data, TDS/TCS credit and advance/self-assessment tax tracking, a
 transparent slab-to-final-liability computation with versioned snapshots, and an ITR
 preparation record with its own validation engine — all reviewable through Phase 7's existing
-engagement/finding/sign-off workflow rather than a parallel one.
+engagement/finding/sign-off workflow rather than a parallel one. Phase 9 ties every prior
+compliance-producing module (GST, TDS, Income Tax, Audit, Bank Reconciliation) together
+through one central coordination layer — a versioned, configurable compliance rule engine
+that generates obligations with reproducible due dates, a task lifecycle (assign → start →
+review → verify → lock) any module can create work items against without duplicating its own
+logic, deterministic overdue detection with no Celery/Redis, an in-app notification system,
+and a lightweight month/week calendar and dashboard — so "what's due, who owns it, what's
+overdue" has one shared answer instead of living separately inside each module.
 
 > **Scope note:** GST/TDS/Income Tax *filing*, live Tally API integration, OCR/AI
 > extraction, and government portal integration are intentionally **not implemented**.
@@ -61,7 +69,13 @@ engagement/finding/sign-off workflow rather than a parallel one.
 > surcharge marginal relief (a `WARNING` is raised near a threshold instead) — every tax rule
 > (slabs/rebate/surcharge/cess/deduction caps) comes from an explicitly configured, versioned
 > `IncomeTaxRuleSet`, never a value invented in code, and the seeded sample rule sets are
-> documented as illustrative, non-authoritative development data. All five only prepare,
+> documented as illustrative, non-authoritative development data. Phase 9 specifically does
+> **not**: send email or SMS (`InAppNotificationProvider` is the only notification provider
+> that exists), integrate a government compliance-deadline feed, or hard-code a statutory
+> due date — every `ComplianceRule.due_date_rule` is a configurable JSON document, and the
+> seeded sample rules are illustrative demo data, not an authoritative compliance calendar.
+> No Celery, no Redis, no background worker — overdue detection is a plain, synchronous sweep
+> run from the dashboard/calendar endpoints. All six only prepare,
 > calculate, validate, reconcile, and export data locally so a human files or acts on it
 > elsewhere. Where the platform anticipates a not-yet-built integration (e.g. structural-only
 > PAN/TAN validation, or bank statement import — CSV/XLSX only today through the same
@@ -355,7 +369,8 @@ tax-compliance-platform/
 │   │                               engine, TDS transactions, TDS challans, TDS
 │   │                               reconciliation, TDS import, TDS return workflow, bank
 │   │                               accounts/statements/matching/reconciliation/reports,
-│   │                               audit workflow, income tax)
+│   │                               audit workflow, income tax, compliance calendar/tasks/
+│   │                               notifications)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -375,12 +390,15 @@ tax-compliance-platform/
 │   │   │                           Checklist/Findings/Review & Sign-off tabs, finding detail),
 │   │   │                           income-tax (dashboard, profile, income, capital gains,
 │   │   │                           deductions, tax payments, computations list/detail with
-│   │   │                           breakdown tree and embedded ITR preparation)
+│   │   │                           breakdown tree and embedded ITR preparation), compliance
+│   │   │                           (dashboard, month calendar, task list/detail, notifications)
+│   │   ├── components/              ...NotificationBell (unread-count bell + dropdown in the
+│   │   │                           app header)
 │   │   ├── services/                thin fetch wrappers per resource
 │   │   ├── hooks/                   useAuth, useToast, TanStack Query hooks (hierarchical
-│   │   │                           query keys — see §23)
+│   │   │                           query keys — see §24)
 │   │   ├── types/                   API response types (api.ts + accounting.ts + gst.ts +
-│   │   │                           tds.ts + bank.ts + audit.ts + incomeTax.ts)
+│   │   │                           tds.ts + bank.ts + audit.ts + incomeTax.ts + compliance.ts)
 │   │   ├── lib/                     api-client (fetch + refresh + upload/downloadBlob), token/session storage, utils
 │   │   └── router/                  route table + ProtectedRoute
 │   └── Dockerfile
@@ -543,6 +561,16 @@ on `(company_id, financial_year_id)` (or `company_id` alone for the computation/
 tables), matching the same scoping convention Phase 3/5's own transactional tables use. No
 Phase 1–7 table is altered.
 
+Phase 9 adds one migration creating 6 tables: `compliance_rules` (a unique
+`(code, company_id, version)` index prevents two active versions of the same rule from
+coexisting), `compliance_obligations` (a unique
+`(company_id, code, financial_year_id, tax_period)` index is the deterministic duplicate
+guard recurring generation relies on), `compliance_tasks` (indexed on
+`(company_id, status)`, `(company_id, due_date)`, and `(source_type, source_id)` for the
+calendar/dashboard/traceability queries), `compliance_task_comments`,
+`compliance_task_evidence`, and `notifications` (indexed on `(user_id, is_read)` for the
+unread-count query). No Phase 1–8 table is altered.
+
 ## 9. Seed Data
 
 ```bash
@@ -568,6 +596,11 @@ Idempotent — safe to run repeatedly. Seeds:
   `seed_default_income_tax_rule_sets`, explicitly documented as illustrative sample data,
   not verified current tax law; a real deployment must configure its own rule sets
   (including for COMPANY/LLP/PARTNERSHIP/TRUST/HUF, none of which are seeded)
+- Five sample platform-wide compliance rules (monthly GSTR-1/GSTR-3B, quarterly TDS return,
+  monthly TDS challan review, monthly bank reconciliation) — Phase 9's
+  `seed_default_compliance_rules`, explicitly documented as illustrative demo data, not an
+  authoritative compliance calendar; a company can layer its own override rule on top of
+  any of them under the same `code`
 
 `DOCUMENT_DELETE` and `DOCUMENT_MANAGE` are deliberately not granted to any seeded
 company-level role — only a platform super admin (via the `is_platform_super_admin`
@@ -745,8 +778,22 @@ Coverage includes:
   computation cannot be recalculated" guard; ITR form-type determination; ITR validation's
   `BANK_ACCOUNT_MISSING` error correctly blocking approval until a bank account exists, then
   succeeding once one is added; tenant isolation on the Income Tax profile
+- **Compliance calendar/tasks (Phase 9):** pure due-date arithmetic (`DAYS_AFTER_PERIOD_END`,
+  `DAY_OF_MONTH_AFTER_PERIOD_END` including short-month clamping, `DAYS_AFTER_START`) against
+  fixtures, no DB involved; a Company Admin creating a company-specific rule vs. being
+  refused a platform-wide one; updating a rule's description never changing its `version`;
+  the natural-key duplicate guard on manually created obligations and the idempotent
+  `generate_from_rule` re-fetch; the full task lifecycle (`start → submit-review →
+  return-for-changes → submit-review → verify → lock`) proving `PENDING → VERIFIED` is
+  unreachable in one step; the `complete` path for a task with no reviewer; the
+  "submitting for review without a reviewer" guard; the "locked task rejects updates" guard;
+  the assignment-target-must-be-a-company-member guard; the overdue sweep correctly flipping
+  a past-due open task to `OVERDUE` (and never touching a completed one) when the dashboard
+  is viewed; comments and evidence (reusing an existing Phase 2 document); the
+  task-assignment notification firing, unread count, mark-read, and mark-all-read; tenant
+  isolation on task access; a CSV export
 
-As of Phase 8, the full suite is **292 tests**, all passing against a real PostgreSQL
+As of Phase 9, the full suite is **315 tests**, all passing against a real PostgreSQL
 database.
 
 ## 13. API Documentation
@@ -1214,10 +1261,71 @@ than a guess. Approving an ITR preparation is the one hard validation gate in Ph
 issue (missing PAN, no active bank account, ...) remains — the same "flag and block, never
 rubber-stamp" principle `AuditEngagementService._check_can_approve()` already applies.
 
-## 22. Future Module Roadmap
+## 22. Compliance Calendar & Task Management Explanation (Phase 9)
+
+Phase 9 is a **coordination layer**, not a seventh compliance engine — it never recomputes
+a GST/TDS/Income Tax/Audit number; it schedules, assigns, tracks, and reminds around work
+those modules already produce.
+
+```
+ComplianceRule (versioned, configurable due-date arithmetic)
+   → ComplianceObligation (one company's instance for one period, reproducible due date)
+        → ComplianceTask (assign → start → submit-review → verify → lock)
+             → Comments / Evidence (reuses Phase 2 Document)
+             → Notification (in-app only)
+   → Calendar / Dashboard (date-range queries, never "load every task")
+```
+
+**Due-date arithmetic is versioned configuration, never a number in Python.**
+`app/services/compliance_deadline_service.py` is a pure function over a
+`ComplianceRule.due_date_rule` JSON document (`DAYS_AFTER_PERIOD_END`,
+`DAY_OF_MONTH_AFTER_PERIOD_END`, `DAYS_AFTER_START`) — the same "rules are data, the
+calculator has no opinion" discipline `income_tax_calculator.py` already applies to tax
+slabs. Every `ComplianceObligation` a rule generates stores that rule's `version`, so a
+later rule change (a statutory deadline moving) never rewrites a historical obligation's
+due date — reproducibility Phase 8's `TaxComputationSnapshot` established first.
+
+**A company-specific rule always overrides the platform-wide default, never replaces it.**
+`ComplianceRule.company_id` is nullable — `NULL` rows are platform-wide samples (only a
+platform super admin can create them), and a company can layer its own override on top
+under the same `code`. `ComplianceRuleRepository.get_active_version()` always prefers the
+company's own version when one exists, the same override precedence `TDSRule` already uses
+for company-specific TDS rates over the platform default.
+
+**A task's status transitions are enforced by a lookup table, not scattered `if`
+statements** (PHASE9 §43) — the same `(from_status, action) -> to_status` pattern already
+proven for `AuditEngagementStatus`/`TaxComputationStatus`. `PENDING -> VERIFIED` is
+unreachable by construction; a task without a reviewer cannot be submitted for review at
+all (`COMPLIANCE_TASK_REVIEWER_REQUIRED`), and a locked task rejects every further edit.
+
+**Overdue is an overlay, not a dead end.** `OVERDUE` is applied by a plain, synchronous
+sweep (`ComplianceTaskService.sweep_overdue()`, run opportunistically from the dashboard and
+calendar endpoints — no Celery, no Redis, no background worker) to any open task whose due
+date has passed; every forward action the task's underlying state supported (`start`,
+`submit_review`, `complete`, `cancel`) still applies from `OVERDUE` exactly as it did before,
+so going overdue never traps a task in a dead status.
+
+**Notifications are in-app only, deduplicated by construction, and built behind one
+interface.** `NotificationService.notify()` is the only way any code creates a
+`Notification` row, and it skips creating a duplicate unread notification for the same
+`(user, type, entity)` — so re-running the overdue sweep never spams the same user twice for
+the same task. `InAppNotificationProvider` is the only implementation of the small
+`NotificationProvider` protocol that exists; a future `EmailNotificationProvider`/
+`SMSNotificationProvider` could be added without any caller changing, but neither exists
+today — there is no email or SMS provider anywhere in this codebase.
+
+**Evidence and source references reuse existing data outright.** `ComplianceTaskEvidence`
+is the same thin join-to-`Document` shape `AuditFindingEvidence` (Phase 7) and
+`ComplianceTaskEvidence`'s own sibling `IncomeTaxProfile`-adjacent evidence tables already
+established — never a second file store. `ComplianceTask.source_type`/`source_id` is the
+same generic-reference shape used throughout the app (`TDSTransaction`, `AuditFinding`,
+...), so a task can point at a GST return, a TDS period, an audit checklist item, or nothing
+at all (`MANUAL`) without a hard FK into five different modules.
+
+## 23. Future Module Roadmap
 
 These remain route-namespace placeholders only, ready for a future module to fill in
-without touching Phases 1–8 (`/compliance`, `/tally`, `/integrations`):
+without touching Phases 1–9 (`/tally`, `/integrations`):
 
 | Phase | Module |
 |---|---|
@@ -1229,7 +1337,8 @@ without touching Phases 1–8 (`/compliance`, `/tally`, `/integrations`):
 | 6 | Bank Reconciliation — statement import, deterministic matching engine, manual/partial matching, adjustments, review workflow *(done — no live bank connection, no AI)* |
 | 7 | CA/Auditor Workflow — engagements, assignments, checklist, findings, evidence, response/review, sign-off *(done — no AI, no statutory certification)* |
 | 8 | Income Tax Compliance Engine — tax profile, versioned tax rules, income/deductions/capital gains, business income from accounting data, tax credits, computation, ITR preparation, validation *(done — no e-filing, no AI, no marginal relief)* |
-| — | OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter`/`IncomeTaxPortalAdapter`/`OpenBankingProvider` for an eventual real filing/bank-feed integration, Compliance calendar, live Tally API integration, surcharge marginal relief, automatic loss carry-forward set-off |
+| 9 | Compliance Calendar & Task Management — versioned rule engine, obligations, task lifecycle, overdue detection, in-app notifications, calendar/dashboard *(done — no Celery/Redis, no email/SMS)* |
+| — | OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter`/`IncomeTaxPortalAdapter`/`OpenBankingProvider` for an eventual real filing/bank-feed integration, live Tally API integration, surcharge marginal relief, automatic loss carry-forward set-off, `EmailNotificationProvider`/`SMSNotificationProvider` |
 
 Each future module is expected to live in its own `models/ schemas/ services/
 repositories/ api/` subtree (per `app/core/permissions.py`'s module grouping), reusing —
@@ -1240,7 +1349,7 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
 
 ---
 
-## 23. Key Architectural Decisions
+## 24. Key Architectural Decisions
 
 - **Modular monolith, not microservices.** One deployable backend, cleanly layered, so
   future modules are new packages inside `app/`, not new services to operate.
@@ -1393,10 +1502,26 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
   recomputes eligibility fresh against its own rule set via
   `DeductionService.eligible_amount_for()`, so a deduction entered before a regime was
   even chosen can never silently carry a stale eligibility figure into the final tax.
+- **Overdue is computed by a synchronous sweep triggered from a real request, not a
+  scheduled job** (Phase 9) — Phase 9's explicit "no Celery, no Redis" constraint ruled out
+  a background worker, so `ComplianceTaskService.sweep_overdue()` runs inline whenever the
+  dashboard or calendar is actually viewed; the tradeoff (a task might show `PENDING` for a
+  few minutes after midnight until someone opens the dashboard) was accepted deliberately
+  rather than adding infrastructure the rest of the project doesn't use.
+- **Every notification write goes through one method, never a direct `Notification()`
+  construction** (Phase 9) — `NotificationService.notify()` owns both the dedup check and
+  the `NotificationProvider.send()` call, so a future email/SMS provider is one class away
+  and every trigger site (assignment, review-required, overdue, comment, reassignment)
+  automatically gets deduplication for free instead of each call site reimplementing it.
+- **A compliance rule's `company_id` is nullable to express "platform default vs. company
+  override" in one table, not two** (Phase 9) — mirrors `GSTTaxRate`/`TDSRule`'s own
+  `company_id IS NULL` convention for statutory defaults; `ComplianceRuleRepository.
+  get_active_version()` centralizes the "company override wins" lookup so no caller has to
+  remember the precedence rule itself.
 
 ---
 
-## 24. Security Notes
+## 25. Security Notes
 
 - Passwords are hashed with **Argon2id** (`argon2-cffi`), never stored or logged in
   plaintext.

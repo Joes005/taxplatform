@@ -18,6 +18,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.permissions import PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_PERMISSIONS, RoleCode
 from app.core.security import hash_password
 from app.models import (
+    ComplianceRule,
     GSTTaxRate,
     IncomeTaxDeductionRule,
     IncomeTaxRebateRule,
@@ -31,6 +32,7 @@ from app.models import (
     TDSSection,
     User,
 )
+from app.models.compliance_enums import ComplianceCategory, ComplianceFrequency, ComplianceModule, CompliancePriority
 from app.models.income_tax_enums import TaxpayerType, TaxRegime
 
 # The standard GST slabs in force since 1 Jul 2017. These are platform-wide
@@ -162,6 +164,64 @@ DEFAULT_INCOME_TAX_RULE_SETS: list[dict] = [
             ("80G", "Donations to eligible charitable institutions", None, True, False),
             ("80CCD(2)", "Employer contribution to NPS", None, True, True),
         ],
+    },
+]
+
+# A small, documented sample of platform-wide compliance rules (PHASE9
+# section 7, 48) — illustrative demo data, not an authoritative statutory
+# compliance calendar. A real deployment must have an admin configure
+# `ComplianceRule` rows for the deadlines actually applicable.
+_COMPLIANCE_RULES_EFFECTIVE_FROM = date(2025, 4, 1)
+DEFAULT_COMPLIANCE_RULES: list[dict] = [
+    {
+        "code": "GSTR3B_MONTHLY",
+        "name": "Monthly GSTR-3B Filing",
+        "description": "Prepare and review GSTR-3B for the previous month.",
+        "category": ComplianceCategory.GST,
+        "module": ComplianceModule.GST,
+        "frequency": ComplianceFrequency.MONTHLY,
+        "due_date_rule": {"type": "DAY_OF_MONTH_AFTER_PERIOD_END", "month_offset": 1, "day": 20},
+        "priority": CompliancePriority.HIGH,
+    },
+    {
+        "code": "GSTR1_MONTHLY",
+        "name": "Monthly GSTR-1 Filing",
+        "description": "Prepare and review GSTR-1 for the previous month.",
+        "category": ComplianceCategory.GST,
+        "module": ComplianceModule.GST,
+        "frequency": ComplianceFrequency.MONTHLY,
+        "due_date_rule": {"type": "DAY_OF_MONTH_AFTER_PERIOD_END", "month_offset": 1, "day": 11},
+        "priority": CompliancePriority.HIGH,
+    },
+    {
+        "code": "TDS_RETURN_QUARTERLY",
+        "name": "Quarterly TDS Return",
+        "description": "Prepare, review, and finalize the quarterly TDS return.",
+        "category": ComplianceCategory.TDS,
+        "module": ComplianceModule.TDS,
+        "frequency": ComplianceFrequency.QUARTERLY,
+        "due_date_rule": {"type": "DAYS_AFTER_PERIOD_END", "days": 31},
+        "priority": CompliancePriority.HIGH,
+    },
+    {
+        "code": "TDS_CHALLAN_MONTHLY",
+        "name": "Monthly TDS Challan Deposit Review",
+        "description": "Confirm TDS deducted this month has been deposited and reconciled.",
+        "category": ComplianceCategory.TDS,
+        "module": ComplianceModule.TDS,
+        "frequency": ComplianceFrequency.MONTHLY,
+        "due_date_rule": {"type": "DAY_OF_MONTH_AFTER_PERIOD_END", "month_offset": 1, "day": 7},
+        "priority": CompliancePriority.MEDIUM,
+    },
+    {
+        "code": "BANK_RECONCILIATION_MONTHLY",
+        "name": "Monthly Bank Reconciliation",
+        "description": "Reconcile every active bank account for the previous month.",
+        "category": ComplianceCategory.BANK,
+        "module": ComplianceModule.BANK_RECONCILIATION,
+        "frequency": ComplianceFrequency.MONTHLY,
+        "due_date_rule": {"type": "DAY_OF_MONTH_AFTER_PERIOD_END", "month_offset": 1, "day": 10},
+        "priority": CompliancePriority.MEDIUM,
     },
 ]
 
@@ -338,6 +398,37 @@ async def seed_default_income_tax_rule_sets(db: AsyncSession) -> None:
     await db.flush()
 
 
+async def seed_default_compliance_rules(db: AsyncSession) -> None:
+    for entry in DEFAULT_COMPLIANCE_RULES:
+        existing = await db.execute(
+            select(ComplianceRule).where(
+                ComplianceRule.code == entry["code"],
+                ComplianceRule.company_id.is_(None),
+                ComplianceRule.version == 1,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            continue
+
+        db.add(
+            ComplianceRule(
+                company_id=None,
+                code=entry["code"],
+                name=entry["name"],
+                description=entry["description"],
+                category=entry["category"],
+                module=entry["module"],
+                frequency=entry["frequency"],
+                due_date_rule=entry["due_date_rule"],
+                priority=entry["priority"],
+                effective_from=_COMPLIANCE_RULES_EFFECTIVE_FROM,
+                version=1,
+                is_active=True,
+            )
+        )
+    await db.flush()
+
+
 async def seed_super_admin(db: AsyncSession) -> None:
     result = await db.execute(select(User).where(User.email == settings.SEED_SUPER_ADMIN_EMAIL.lower()))
     if result.scalar_one_or_none() is not None:
@@ -364,6 +455,7 @@ async def run_seed() -> None:
         await seed_gst_default_tax_rates(db)
         await seed_default_tds_sections_and_rules(db)
         await seed_default_income_tax_rule_sets(db)
+        await seed_default_compliance_rules(db)
         await seed_super_admin(db)
         await db.commit()
     logger.info("Seed complete.")

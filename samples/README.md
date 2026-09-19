@@ -197,3 +197,37 @@ ITR preparation blocked on validation until a bank account exists.
 `tests/test_income_tax.py` in the backend exercises this same scenario end-to-end, with the
 tax figures above asserted as exact hand-computed `Decimal` values — run it after any change
 to the seeded rule sets or the calculator to confirm the outcomes still line up.
+
+## Phase 9 — Compliance calendar walkthrough (no import file — created through the API/UI)
+
+Same fictional company, "ABC Traders Pvt Ltd" — one task per compliance category, plus the
+assign → review → verify lifecycle and the overdue sweep.
+
+1. Run `python -m app.seed` if you haven't already, so the five sample compliance rules
+   exist (`Compliance → Tasks`, then create a task manually — there's no dedicated "generate
+   from rule" screen in this cut; rule-driven generation is meant to be invoked by whichever
+   module owns a period, e.g. a future GST return-period hook).
+2. Create five tasks, one per module, each due a few days out:
+   - **GST compliance review** — category `GST`, module `GST`, priority `HIGH`.
+   - **TDS quarterly review** — category `TDS`, module `TDS`, priority `HIGH`.
+   - **Income Tax computation review** — category `INCOME_TAX`, module `INCOME_TAX`.
+   - **Audit checklist review** — category `AUDIT`, module `AUDIT`.
+   - **Bank reconciliation review** — category `BANK`, module `BANK_RECONCILIATION`.
+   Assign one to yourself and set a reviewer (a second user, or grant yourself the
+   `AUDITOR` role via `Users` to review your own demo data).
+3. Open the GST task: `Start` it, add a comment, attach an existing document as evidence,
+   then `Submit for Review`. As the reviewer, `Return for Changes` once to see it go back to
+   `IN_PROGRESS` — a direct `PENDING → VERIFIED` jump is impossible by construction — then
+   `Submit for Review` again and `Verify` it. `Lock` it once verified; further edits are
+   rejected with `COMPLIANCE_TASK_LOCKED`.
+4. Create a sixth task with a due date in the past (e.g. yesterday) and leave it `PENDING`.
+   Open `Compliance → Dashboard` — the sweep runs inline on that request (no Celery/Redis;
+   see PHASE9 §16) and the task flips to `OVERDUE` with a notification sent to its assignee.
+5. Check the notification bell in the header — the assignment/review-required/verified
+   events above each produced an in-app notification (never email/SMS). Open
+   `Notifications` to see the full history, mark one read, or `Mark all as read`.
+
+`tests/test_compliance.py` in the backend exercises this same lifecycle end-to-end
+(including the reviewer-required guard, the overdue sweep, and notification dedup) — run it
+after any change to the task transition table or the deadline rule engine to confirm the
+outcomes still line up.
