@@ -29,6 +29,28 @@ from app.models.gst_review_note import GSTReviewNote
 from app.models.gst_tax_rate import GSTTaxRate
 from app.models.gstr2b_record import GSTR2BRecord
 from app.models.import_job import ImportError, ImportJob, ImportRow
+from app.models.income_tax_adjustment import IncomeTaxAdjustment
+from app.models.income_tax_capital_gain import IncomeTaxCapitalGain
+from app.models.income_tax_credit import IncomeTaxCreditEntry
+from app.models.income_tax_deduction import IncomeTaxDeduction
+from app.models.income_tax_income import (
+    IncomeTaxExemptIncome,
+    IncomeTaxHousePropertyIncome,
+    IncomeTaxOtherIncome,
+    IncomeTaxSalaryIncome,
+)
+from app.models.income_tax_ledger_classification import IncomeTaxLedgerClassification
+from app.models.income_tax_loss import IncomeTaxLoss
+from app.models.income_tax_payment import IncomeTaxAdvanceTaxPayment, IncomeTaxSelfAssessmentTaxPayment
+from app.models.income_tax_profile import IncomeTaxProfile
+from app.models.income_tax_rule_set import (
+    IncomeTaxDeductionRule,
+    IncomeTaxRebateRule,
+    IncomeTaxRuleSet,
+    IncomeTaxSlab,
+    IncomeTaxSurchargeRule,
+)
+from app.models.itr_preparation import ITRPreparation
 from app.models.journal_entry import JournalEntry, JournalEntryLine
 from app.models.ledger import Ledger
 from app.models.membership import CompanyMembership, MembershipStatus
@@ -50,6 +72,7 @@ from app.models.tds_review_note import TDSReviewNote
 from app.models.tds_rule import TDSRule
 from app.models.tds_section import TDSSection
 from app.models.tds_transaction import TDSTransaction
+from app.models.tax_computation import TaxComputation, TaxComputationSnapshot
 from app.models.user import User
 from app.models.vendor import Vendor
 
@@ -95,6 +118,25 @@ __all__ = [
     "ImportError",
     "ImportJob",
     "ImportRow",
+    "ITRPreparation",
+    "IncomeTaxAdjustment",
+    "IncomeTaxAdvanceTaxPayment",
+    "IncomeTaxCapitalGain",
+    "IncomeTaxCreditEntry",
+    "IncomeTaxDeduction",
+    "IncomeTaxDeductionRule",
+    "IncomeTaxExemptIncome",
+    "IncomeTaxHousePropertyIncome",
+    "IncomeTaxLedgerClassification",
+    "IncomeTaxLoss",
+    "IncomeTaxOtherIncome",
+    "IncomeTaxProfile",
+    "IncomeTaxRebateRule",
+    "IncomeTaxRuleSet",
+    "IncomeTaxSalaryIncome",
+    "IncomeTaxSelfAssessmentTaxPayment",
+    "IncomeTaxSlab",
+    "IncomeTaxSurchargeRule",
     "JournalEntry",
     "JournalEntryLine",
     "Ledger",
@@ -121,6 +163,8 @@ __all__ = [
     "TDSRule",
     "TDSSection",
     "TDSTransaction",
+    "TaxComputation",
+    "TaxComputationSnapshot",
     "User",
     "Vendor",
 ]

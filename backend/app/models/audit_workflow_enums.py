@@ -73,6 +73,14 @@ class AuditFindingCategory(StrEnum):
     CONTROL = "CONTROL"
     COMPLIANCE = "COMPLIANCE"
     PROCESS = "PROCESS"
+    # --- Income Tax (Phase 8) ---
+    INCOME_TAX = "INCOME_TAX"
+    TAX_COMPUTATION = "TAX_COMPUTATION"
+    ITR_VALIDATION = "ITR_VALIDATION"
+    TDS_CREDIT = "TDS_CREDIT"
+    DEDUCTION = "DEDUCTION"
+    CAPITAL_GAINS = "CAPITAL_GAINS"
+    BUSINESS_INCOME = "BUSINESS_INCOME"
     OTHER = "OTHER"
 
 
@@ -117,6 +125,14 @@ class AuditFindingSourceType(StrEnum):
     TDS_CHALLAN = "TDS_CHALLAN"
     BANK_TRANSACTION = "BANK_TRANSACTION"
     BANK_RECONCILIATION = "BANK_RECONCILIATION"
+    # --- Income Tax (Phase 8) --- kept to <=20 chars: this StrEnum backs
+    # `audit_findings.source_type`, an existing VARCHAR(20) column from
+    # Phase 7 (PHASE8 §90 — smallest compatible change, no ALTER needed).
+    TAX_COMPUTATION = "TAX_COMPUTATION"
+    ITR_PREPARATION = "ITR_PREPARATION"
+    TAX_DEDUCTION = "TAX_DEDUCTION"
+    CAPITAL_GAIN = "CAPITAL_GAIN"
+    TAX_CREDIT_ENTRY = "TAX_CREDIT_ENTRY"
     OTHER = "OTHER"
 
 

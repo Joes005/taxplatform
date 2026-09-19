@@ -55,6 +55,15 @@ import AuditEngagementsPage from "@/pages/audit/AuditEngagementsPage";
 import AuditEngagementDetailPage from "@/pages/audit/AuditEngagementDetailPage";
 import AuditFindingDetailPage from "@/pages/audit/AuditFindingDetailPage";
 
+import IncomeTaxDashboardPage from "@/pages/income-tax/IncomeTaxDashboardPage";
+import IncomeTaxProfilePage from "@/pages/income-tax/IncomeTaxProfilePage";
+import IncomeTaxIncomePage from "@/pages/income-tax/IncomeTaxIncomePage";
+import CapitalGainsPage from "@/pages/income-tax/CapitalGainsPage";
+import DeductionsPage from "@/pages/income-tax/DeductionsPage";
+import TaxPaymentsPage from "@/pages/income-tax/TaxPaymentsPage";
+import TaxComputationsPage from "@/pages/income-tax/TaxComputationsPage";
+import TaxComputationDetailPage from "@/pages/income-tax/TaxComputationDetailPage";
+
 export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
@@ -110,6 +119,14 @@ export const router = createBrowserRouter([
           { path: "/audits/engagements", element: <AuditEngagementsPage /> },
           { path: "/audits/engagements/:engagementId", element: <AuditEngagementDetailPage /> },
           { path: "/audits/findings/:findingId", element: <AuditFindingDetailPage /> },
+          { path: "/income-tax", element: <IncomeTaxDashboardPage /> },
+          { path: "/income-tax/profile", element: <IncomeTaxProfilePage /> },
+          { path: "/income-tax/income", element: <IncomeTaxIncomePage /> },
+          { path: "/income-tax/capital-gains", element: <CapitalGainsPage /> },
+          { path: "/income-tax/deductions", element: <DeductionsPage /> },
+          { path: "/income-tax/payments", element: <TaxPaymentsPage /> },
+          { path: "/income-tax/computations", element: <TaxComputationsPage /> },
+          { path: "/income-tax/computations/:computationId", element: <TaxComputationDetailPage /> },
         ],
       },
     ],

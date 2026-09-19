@@ -163,3 +163,37 @@ above uses — and three findings that show each of a finding's three outcomes.
 `tests/test_audit_workflow.py` in the backend exercises this same lifecycle end-to-end
 (including both blocking guards above) — run it after any change to the engagement or
 finding transition tables to confirm the outcomes still line up.
+
+## Phase 8 — Income Tax walkthrough (no import file — created through the API/UI)
+
+Same fictional company again, "ABC Traders Pvt Ltd" — a New Regime computation from real
+posted accounting data, an Old Regime computation showing a deduction get capped, and an
+ITR preparation blocked on validation until a bank account exists.
+
+1. Under `Income Tax → Tax Profile`, create a profile (PAN `AAAPA1234A`, taxpayer type
+   `INDIVIDUAL` — the only type this platform ships a sample rule set for). Run
+   `python -m app.seed` first if you haven't already, so the illustrative AY 2026-27 rule
+   sets exist.
+2. Post a Sales Invoice for ₹20,00,000 and a Purchase Invoice for ₹5,00,000 against the
+   financial year covering AY 2026-27 (FY 2025-26). Under `Income Tax → Deductions`, add a
+   `80C` deduction claiming ₹2,00,000.
+3. Under `Income Tax → Computations`, create a computation for that financial year with
+   `NEW_REGIME`, then `Calculate`. Business income resolves to ₹15,00,000 (₹20L revenue −
+   ₹5L purchases); since the New Regime disallows `80C` entirely, deductions come to ₹0,
+   taxable income stays ₹15,00,000, and the breakdown shows the full slab → cess →
+   ₹1,09,200 gross tax liability trail — nothing in the frontend computed that number, it's
+   read straight from the API response.
+4. Create a second computation for the same financial year with `OLD_REGIME` and
+   `Calculate` — the same ₹2,00,000 claimed `80C` deduction is now capped at the rule set's
+   ₹1,50,000 `max_amount`, landing on a different taxable income and a different tax
+   (₹65,000 gross tax liability against the same underlying business income).
+5. `Submit for Review` and `Approve` the New Regime computation (Approve/Lock require the
+   `AUDITOR` role — log in as one, or grant it to your admin user via `Users`). Then create
+   an `ITR Preparation` from that computation — it resolves to `ITR_3` (business income
+   present). `Validate` it: without an active bank account, this returns a `BANK_ACCOUNT_MISSING`
+   error, and `Approve` is refused with `ITR_VALIDATION_ERRORS_BLOCK_APPROVAL`. Add a bank
+   account under `Banking → Bank Accounts`, `Validate` again, then `Approve` and `Lock`.
+
+`tests/test_income_tax.py` in the backend exercises this same scenario end-to-end, with the
+tax figures above asserted as exact hand-computed `Decimal` values — run it after any change
+to the seeded rule sets or the calculator to confirm the outcomes still line up.

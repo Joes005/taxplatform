@@ -198,6 +198,17 @@ class PermissionCode(StrEnum):
     AUDIT_REPORT_VIEW = "AUDIT_REPORT_VIEW"
     AUDIT_REPORT_EXPORT = "AUDIT_REPORT_EXPORT"
 
+    # --- Income Tax (Phase 8) ---
+    INCOME_TAX_VIEW = "INCOME_TAX_VIEW"
+    INCOME_TAX_CREATE = "INCOME_TAX_CREATE"
+    INCOME_TAX_UPDATE = "INCOME_TAX_UPDATE"
+    INCOME_TAX_CALCULATE = "INCOME_TAX_CALCULATE"
+    INCOME_TAX_VALIDATE = "INCOME_TAX_VALIDATE"
+    INCOME_TAX_REVIEW = "INCOME_TAX_REVIEW"
+    INCOME_TAX_APPROVE = "INCOME_TAX_APPROVE"
+    INCOME_TAX_LOCK = "INCOME_TAX_LOCK"
+    INCOME_TAX_EXPORT = "INCOME_TAX_EXPORT"
+
 
 class RoleCode(StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
@@ -347,6 +358,15 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.AUDIT_ENGAGEMENT_LOCK, "AUDIT_WORKFLOW", "Close and lock an engagement"),
     (PermissionCode.AUDIT_REPORT_VIEW, "AUDIT_WORKFLOW", "View audit workflow reports and the review queue"),
     (PermissionCode.AUDIT_REPORT_EXPORT, "AUDIT_WORKFLOW", "Export audit workflow reports"),
+    (PermissionCode.INCOME_TAX_VIEW, "INCOME_TAX", "View Income Tax profile, income, deductions, and computations"),
+    (PermissionCode.INCOME_TAX_CREATE, "INCOME_TAX", "Create Income Tax profile, income, deduction, and payment records"),
+    (PermissionCode.INCOME_TAX_UPDATE, "INCOME_TAX", "Update Income Tax profile, income, deduction, and payment records"),
+    (PermissionCode.INCOME_TAX_CALCULATE, "INCOME_TAX", "Run a tax computation"),
+    (PermissionCode.INCOME_TAX_VALIDATE, "INCOME_TAX", "Run ITR validation"),
+    (PermissionCode.INCOME_TAX_REVIEW, "INCOME_TAX", "Submit a computation/ITR preparation for review"),
+    (PermissionCode.INCOME_TAX_APPROVE, "INCOME_TAX", "Approve a tax computation or ITR preparation"),
+    (PermissionCode.INCOME_TAX_LOCK, "INCOME_TAX", "Lock an approved tax computation or ITR preparation"),
+    (PermissionCode.INCOME_TAX_EXPORT, "INCOME_TAX", "Export Income Tax reports"),
 ]
 
 ALL_PERMISSION_CODES: list[PermissionCode] = [p[0] for p in PERMISSIONS]
@@ -481,6 +501,13 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.AUDIT_EVIDENCE_MANAGE,
         PermissionCode.AUDIT_REPORT_VIEW,
         PermissionCode.AUDIT_REPORT_EXPORT,
+        PermissionCode.INCOME_TAX_VIEW,
+        PermissionCode.INCOME_TAX_CREATE,
+        PermissionCode.INCOME_TAX_UPDATE,
+        PermissionCode.INCOME_TAX_CALCULATE,
+        PermissionCode.INCOME_TAX_VALIDATE,
+        PermissionCode.INCOME_TAX_REVIEW,
+        PermissionCode.INCOME_TAX_EXPORT,
     ],
     RoleCode.ACCOUNTANT: [
         PermissionCode.COMPANY_VIEW,
@@ -583,6 +610,13 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.AUDIT_FINDING_RESPOND,
         PermissionCode.AUDIT_EVIDENCE_MANAGE,
         PermissionCode.AUDIT_REPORT_VIEW,
+        PermissionCode.INCOME_TAX_VIEW,
+        PermissionCode.INCOME_TAX_CREATE,
+        PermissionCode.INCOME_TAX_UPDATE,
+        PermissionCode.INCOME_TAX_CALCULATE,
+        PermissionCode.INCOME_TAX_VALIDATE,
+        PermissionCode.INCOME_TAX_REVIEW,
+        PermissionCode.INCOME_TAX_EXPORT,
     ],
     RoleCode.AUDITOR: [
         PermissionCode.COMPANY_VIEW,
@@ -644,6 +678,10 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.AUDIT_ENGAGEMENT_LOCK,
         PermissionCode.AUDIT_REPORT_VIEW,
         PermissionCode.AUDIT_REPORT_EXPORT,
+        PermissionCode.INCOME_TAX_VIEW,
+        PermissionCode.INCOME_TAX_APPROVE,
+        PermissionCode.INCOME_TAX_LOCK,
+        PermissionCode.INCOME_TAX_EXPORT,
     ],
 }
 

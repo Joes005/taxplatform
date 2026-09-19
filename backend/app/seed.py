@@ -19,6 +19,11 @@ from app.core.permissions import PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_PERMISSION
 from app.core.security import hash_password
 from app.models import (
     GSTTaxRate,
+    IncomeTaxDeductionRule,
+    IncomeTaxRebateRule,
+    IncomeTaxRuleSet,
+    IncomeTaxSlab,
+    IncomeTaxSurchargeRule,
     Permission,
     Role,
     RolePermission,
@@ -26,6 +31,7 @@ from app.models import (
     TDSSection,
     User,
 )
+from app.models.income_tax_enums import TaxpayerType, TaxRegime
 
 # The standard GST slabs in force since 1 Jul 2017. These are platform-wide
 # defaults (company_id=None) a company can use as-is or supplement with its
@@ -95,6 +101,67 @@ DEFAULT_TDS_SECTIONS: list[dict] = [
         "no_pan_rate": Decimal("5"),
         "threshold_amount": Decimal("0"),
         "aggregate_threshold_amount": Decimal("5000000"),
+    },
+]
+
+# One illustrative, explicitly non-authoritative Income Tax rule set per
+# regime for AY 2026-27 (FY 2025-26), INDIVIDUAL taxpayers only — the
+# same "small, documented sample configuration" precedent as
+# DEFAULT_TDS_SECTIONS above (PHASE8 section 88). Real slab/rebate/
+# surcharge figures change by Finance Act; a real deployment must have a
+# CA configure `IncomeTaxRuleSet` rows (including for COMPANY/LLP/
+# PARTNERSHIP/TRUST/HUF, none of which are seeded here) from an official
+# source before this is used for anything beyond development/demo.
+_INCOME_TAX_RULE_SET_ASSESSMENT_YEAR = "2026-27"
+_INCOME_TAX_RULE_SET_EFFECTIVE_FROM = date(2025, 4, 1)
+
+DEFAULT_INCOME_TAX_RULE_SETS: list[dict] = [
+    {
+        "tax_regime": TaxRegime.NEW_REGIME,
+        "cess_rate": Decimal("4.00"),
+        "slabs": [
+            (Decimal("0"), Decimal("400000"), Decimal("0")),
+            (Decimal("400000"), Decimal("800000"), Decimal("5")),
+            (Decimal("800000"), Decimal("1200000"), Decimal("10")),
+            (Decimal("1200000"), Decimal("1600000"), Decimal("15")),
+            (Decimal("1600000"), Decimal("2000000"), Decimal("20")),
+            (Decimal("2000000"), Decimal("2400000"), Decimal("25")),
+            (Decimal("2400000"), None, Decimal("30")),
+        ],
+        "rebate": (Decimal("1200000"), Decimal("60000")),
+        "surcharge": [
+            (Decimal("5000000"), Decimal("10")),
+            (Decimal("10000000"), Decimal("15")),
+            (Decimal("20000000"), Decimal("25")),
+        ],
+        "deduction_rules": [
+            ("80CCD(2)", "Employer contribution to NPS", None, True, True),
+        ],
+    },
+    {
+        "tax_regime": TaxRegime.OLD_REGIME,
+        "cess_rate": Decimal("4.00"),
+        "slabs": [
+            (Decimal("0"), Decimal("250000"), Decimal("0")),
+            (Decimal("250000"), Decimal("500000"), Decimal("5")),
+            (Decimal("500000"), Decimal("1000000"), Decimal("20")),
+            (Decimal("1000000"), None, Decimal("30")),
+        ],
+        "rebate": (Decimal("500000"), Decimal("12500")),
+        "surcharge": [
+            (Decimal("5000000"), Decimal("10")),
+            (Decimal("10000000"), Decimal("15")),
+            (Decimal("20000000"), Decimal("25")),
+            (Decimal("50000000"), Decimal("37")),
+        ],
+        "deduction_rules": [
+            ("80C", "Life insurance, PF, ELSS, tuition fees, etc.", Decimal("150000"), True, False),
+            ("80D", "Health insurance premium", Decimal("25000"), True, False),
+            ("80TTA", "Interest on savings account (non-senior citizen)", Decimal("10000"), True, False),
+            ("80TTB", "Interest income (senior citizen)", Decimal("50000"), True, False),
+            ("80G", "Donations to eligible charitable institutions", None, True, False),
+            ("80CCD(2)", "Employer contribution to NPS", None, True, True),
+        ],
     },
 ]
 
@@ -210,6 +277,67 @@ async def seed_default_tds_sections_and_rules(db: AsyncSession) -> None:
     await db.flush()
 
 
+async def seed_default_income_tax_rule_sets(db: AsyncSession) -> None:
+    for entry in DEFAULT_INCOME_TAX_RULE_SETS:
+        existing = await db.execute(
+            select(IncomeTaxRuleSet).where(
+                IncomeTaxRuleSet.assessment_year == _INCOME_TAX_RULE_SET_ASSESSMENT_YEAR,
+                IncomeTaxRuleSet.taxpayer_type == TaxpayerType.INDIVIDUAL,
+                IncomeTaxRuleSet.tax_regime == entry["tax_regime"],
+                IncomeTaxRuleSet.version == 1,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            continue
+
+        rule_set = IncomeTaxRuleSet(
+            assessment_year=_INCOME_TAX_RULE_SET_ASSESSMENT_YEAR,
+            taxpayer_type=TaxpayerType.INDIVIDUAL,
+            tax_regime=entry["tax_regime"],
+            effective_from=_INCOME_TAX_RULE_SET_EFFECTIVE_FROM,
+            version=1,
+            is_active=True,
+            cess_rate=entry["cess_rate"],
+            description=(
+                "Illustrative sample rule set for local development/demo only — "
+                "verify against the official CBDT notification before real use."
+            ),
+        )
+        db.add(rule_set)
+        await db.flush()
+
+        for index, (lower, upper, rate) in enumerate(entry["slabs"]):
+            db.add(
+                IncomeTaxSlab(
+                    rule_set_id=rule_set.id, lower_limit=lower, upper_limit=upper, rate=rate, order_index=index
+                )
+            )
+
+        max_income, max_rebate = entry["rebate"]
+        db.add(IncomeTaxRebateRule(rule_set_id=rule_set.id, maximum_income=max_income, maximum_rebate=max_rebate))
+
+        for index, (threshold, rate) in enumerate(entry["surcharge"]):
+            db.add(
+                IncomeTaxSurchargeRule(
+                    rule_set_id=rule_set.id, income_threshold=threshold, rate=rate, order_index=index
+                )
+            )
+
+        for section_code, description, max_amount, allowed_old, allowed_new in entry["deduction_rules"]:
+            db.add(
+                IncomeTaxDeductionRule(
+                    rule_set_id=rule_set.id,
+                    section_code=section_code,
+                    description=description,
+                    max_amount=max_amount,
+                    allowed_in_old_regime=allowed_old,
+                    allowed_in_new_regime=allowed_new,
+                )
+            )
+
+    await db.flush()
+
+
 async def seed_super_admin(db: AsyncSession) -> None:
     result = await db.execute(select(User).where(User.email == settings.SEED_SUPER_ADMIN_EMAIL.lower()))
     if result.scalar_one_or_none() is not None:
@@ -235,6 +363,7 @@ async def run_seed() -> None:
         await seed_role_permissions(db, roles, permissions)
         await seed_gst_default_tax_rates(db)
         await seed_default_tds_sections_and_rules(db)
+        await seed_default_income_tax_rule_sets(db)
         await seed_super_admin(db)
         await db.commit()
     logger.info("Seed complete.")

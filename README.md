@@ -7,6 +7,7 @@
 **Phase 5 — TDS Compliance Engine (Deductees, Rule Engine, Challans, Reconciliation, Returns)**
 **Phase 6 — Bank Reconciliation Engine (Statement Import, Matching, Review Workflow)**
 **Phase 7 — CA/Auditor Workflow (Engagements, Findings, Evidence, Review, Sign-off)**
+**Phase 8 — Income Tax Compliance Engine (Computation, Tax Credits, ITR Preparation, Validation)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -32,7 +33,14 @@ lifecycle, an assignable team, a standard (editable) checklist, findings that re
 prior-phase record without duplicating it, an evidence trail that reuses Phase 2's document
 store, a formal response/review cycle, and an internal review + sign-off trail — so a review
 of this company's data has one shared, auditable home instead of being tracked in someone's
-inbox or spreadsheet.
+inbox or spreadsheet. Phase 8 builds an Income Tax **preparation and computation** engine on
+top of every prior phase — a taxpayer profile, versioned/configurable tax rules (slabs,
+rebate, surcharge, cess, deduction eligibility) per assessment year and regime, salary/house-
+property/capital-gains/other-source income entry, business income derived straight from the
+Phase 3 accounting data, TDS/TCS credit and advance/self-assessment tax tracking, a
+transparent slab-to-final-liability computation with versioned snapshots, and an ITR
+preparation record with its own validation engine — all reviewable through Phase 7's existing
+engagement/finding/sign-off workflow rather than a parallel one.
 
 > **Scope note:** GST/TDS/Income Tax *filing*, live Tally API integration, OCR/AI
 > extraction, and government portal integration are intentionally **not implemented**.
@@ -47,7 +55,13 @@ inbox or spreadsheet.
 > (severity is an internal workflow classification only — `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` —
 > never a legal determination), or let a sign-off claim to be a DSC, ICAI, or statutory
 > certification — every sign-off statement is a fixed, neutral, internal-acknowledgement
-> sentence the service layer controls, never freely authored text. All four only prepare,
+> sentence the service layer controls, never freely authored text. Phase 8 specifically does
+> **not**: log into the Income Tax e-filing portal, fetch Form 26AS/AIS live, verify a PAN
+> against any government service beyond structural format, file any ITR form, or compute
+> surcharge marginal relief (a `WARNING` is raised near a threshold instead) — every tax rule
+> (slabs/rebate/surcharge/cess/deduction caps) comes from an explicitly configured, versioned
+> `IncomeTaxRuleSet`, never a value invented in code, and the seeded sample rule sets are
+> documented as illustrative, non-authoritative development data. All five only prepare,
 > calculate, validate, reconcile, and export data locally so a human files or acts on it
 > elsewhere. Where the platform anticipates a not-yet-built integration (e.g. structural-only
 > PAN/TAN validation, or bank statement import — CSV/XLSX only today through the same
@@ -341,7 +355,7 @@ tax-compliance-platform/
 │   │                               engine, TDS transactions, TDS challans, TDS
 │   │                               reconciliation, TDS import, TDS return workflow, bank
 │   │                               accounts/statements/matching/reconciliation/reports,
-│   │                               audit workflow)
+│   │                               audit workflow, income tax)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -358,12 +372,15 @@ tax-compliance-platform/
 │   │   │                           bank (dashboard, accounts, statements, transactions,
 │   │   │                           reconciliations, reconciliation detail), audit (dashboard,
 │   │   │                           engagements list, engagement detail with Overview/
-│   │   │                           Checklist/Findings/Review & Sign-off tabs, finding detail)
+│   │   │                           Checklist/Findings/Review & Sign-off tabs, finding detail),
+│   │   │                           income-tax (dashboard, profile, income, capital gains,
+│   │   │                           deductions, tax payments, computations list/detail with
+│   │   │                           breakdown tree and embedded ITR preparation)
 │   │   ├── services/                thin fetch wrappers per resource
 │   │   ├── hooks/                   useAuth, useToast, TanStack Query hooks (hierarchical
-│   │   │                           query keys — see §22)
+│   │   │                           query keys — see §23)
 │   │   ├── types/                   API response types (api.ts + accounting.ts + gst.ts +
-│   │   │                           tds.ts + bank.ts + audit.ts)
+│   │   │                           tds.ts + bank.ts + audit.ts + incomeTax.ts)
 │   │   ├── lib/                     api-client (fetch + refresh + upload/downloadBlob), token/session storage, utils
 │   │   └── router/                  route table + ProtectedRoute
 │   └── Dockerfile
@@ -511,6 +528,21 @@ unique index** on `audit_assignments` enforcing one active `(engagement_id, user
 assignment at a time (`WHERE is_active = true`, the same pattern Phase 1 already uses for
 active company memberships). No Phase 1–6 table is altered.
 
+Phase 8 adds one migration creating 20 tables: `income_tax_profiles`; the versioned rule-set
+family `income_tax_rule_sets`, `income_tax_slabs`, `income_tax_rebate_rules`,
+`income_tax_surcharge_rules`, `income_tax_deduction_rules`; the income tables
+`income_tax_salary_incomes`, `income_tax_house_property_incomes`, `income_tax_other_incomes`,
+`income_tax_exempt_incomes`, `income_tax_capital_gains`; `income_tax_deductions`,
+`income_tax_adjustments`, `income_tax_ledger_classifications`, `income_tax_losses`,
+`income_tax_advance_tax_payments`, `income_tax_self_assessment_tax_payments`,
+`income_tax_credit_entries`; and the computation/preparation core `tax_computations`,
+`tax_computation_snapshots`, `itr_preparations`. A unique index on
+`(assessment_year, taxpayer_type, tax_regime, version)` on `income_tax_rule_sets` prevents
+two active versions of the same rule set from ever coexisting; every other table is indexed
+on `(company_id, financial_year_id)` (or `company_id` alone for the computation/preparation
+tables), matching the same scoping convention Phase 3/5's own transactional tables use. No
+Phase 1–7 table is altered.
+
 ## 9. Seed Data
 
 ```bash
@@ -530,6 +562,12 @@ Idempotent — safe to run repeatedly. Seeds:
   rates — Phase 5's `seed_default_tds_sections_and_rules`, explicitly documented as
   development/testing configuration, not an authoritative statutory rate table; a company
   can add its own section-specific override rules on top
+- One illustrative Income Tax rule set per regime (OLD_REGIME, NEW_REGIME) for AY 2026-27,
+  INDIVIDUAL taxpayers only, with sample slabs/rebate/surcharge/cess and a handful of
+  Chapter VI-A deduction rules (80C/80D/80TTA/80TTB/80G/80CCD(2)) — Phase 8's
+  `seed_default_income_tax_rule_sets`, explicitly documented as illustrative sample data,
+  not verified current tax law; a real deployment must configure its own rule sets
+  (including for COMPANY/LLP/PARTNERSHIP/TRUST/HUF, none of which are seeded)
 
 `DOCUMENT_DELETE` and `DOCUMENT_MANAGE` are deliberately not granted to any seeded
 company-level role — only a platform super admin (via the `is_platform_super_admin`
@@ -693,8 +731,22 @@ Coverage includes:
   warning for the same source record; the response → review → accept/resolve cycle; evidence
   reusing an existing Phase 2 document by id; reject/reopen transitions; RBAC (an Accountant
   cannot create or approve an engagement); tenant isolation on engagement access
+- **Income Tax (Phase 8):** PAN format validation on the profile; computed fields (salary
+  taxable amount, house-property NAV/standard-deduction/income-or-loss, capital gain amount,
+  the sale-before-purchase-date guard) verified against hand-computed `Decimal` values; a
+  full computation end-to-end against the seeded sample NEW_REGIME rule set with every
+  breakdown figure (business income from real posted sales/purchase invoices, slab tax,
+  cess, gross tax liability, balance payable) asserted against hand-computed expected
+  values; an OLD_REGIME deduction correctly capped at the rule set's `max_amount` even when
+  a larger amount was claimed; the same section disallowed entirely under NEW_REGIME; a
+  disallowed ledger classification correctly added back into taxable business income; the
+  full computation lifecycle (`calculate → submit-review → approve → lock`) with RBAC (a
+  Company Admin can calculate/submit but not approve — that's Auditor-only) and the "locked
+  computation cannot be recalculated" guard; ITR form-type determination; ITR validation's
+  `BANK_ACCOUNT_MISSING` error correctly blocking approval until a bank account exists, then
+  succeeding once one is added; tenant isolation on the Income Tax profile
 
-As of Phase 7, the full suite is **279 tests**, all passing against a real PostgreSQL
+As of Phase 8, the full suite is **292 tests**, all passing against a real PostgreSQL
 database.
 
 ## 13. API Documentation
@@ -1072,10 +1124,100 @@ an active `CompanyMembership` for the engagement's company before it will create
 membership system are the only source of "who can be put on this engagement," never a
 parallel identity concept.
 
-## 21. Future Module Roadmap
+## 21. Income Tax Compliance Engine Explanation (Phase 8)
+
+Phase 8 is a **preparation and computation** layer, not a filing system — it never talks to
+the Income Tax e-filing portal and never produces a legal opinion on a return.
+
+```
+Taxpayer Profile (PAN, taxpayer type, regime)
+   → Financial Year → Assessment Year (computed, never string-sliced)
+   → Versioned Tax Rule Set (slabs, rebate, surcharge, cess, deduction eligibility)
+   → Income collection (salary, house property, capital gains, other sources, exempt)
+   → Accounting-derived business income (Phase 3 invoices + ledger movement)
+   → Deductions (eligibility capped/regime-gated by the rule set, never the claim as-is)
+   → Current-year loss set-off
+   → Gross Total Income → Taxable Income
+   → Slab tax → Rebate → Surcharge → Cess → Gross Tax Liability
+   → TDS/TCS credit + Advance Tax + Self-Assessment Tax
+   → Balance Payable / Refund
+   → Computation Snapshot (versioned, reproducible)
+   → ITR Preparation → Validation → Phase 7 review → Internal Approval → Locked
+```
+
+**Tax law is versioned configuration, never a number baked into the calculator.**
+`IncomeTaxRuleSet` (one row per assessment year + taxpayer type + regime, versioned) owns
+child `IncomeTaxSlab`/`IncomeTaxRebateRule`/`IncomeTaxSurchargeRule`/`IncomeTaxDeductionRule`
+rows; `app/services/income_tax_calculator.py` is pure arithmetic over whatever rule set it's
+handed — it contains no slab percentage, rebate ceiling, or cess rate of its own. The one
+rule set seeded (`seed_default_income_tax_rule_sets`, AY 2026-27, INDIVIDUAL, both regimes)
+is explicitly documented as illustrative sample data, the same "small, documented, non-
+authoritative" precedent Phase 5 set for `DEFAULT_TDS_SECTIONS` — a real deployment must
+configure its own verified figures, including for COMPANY/LLP/PARTNERSHIP/TRUST/HUF, none
+of which are seeded here.
+
+**TDS credit is a genuinely new concept, not a reuse of Phase 5's `TDSTransaction`.**
+Phase 5 models TDS *this company deducts from its vendors* — an outgoing liability tracked
+toward 24Q/26Q filing. Income Tax "TDS credit" is the opposite direction: tax *other
+parties deduct on income paid to this company*, the Form 26AS-style asset that reduces this
+company's own liability. Since Phase 5 never captured that data, Phase 8 adds one small,
+honestly-scoped model (`IncomeTaxCreditEntry`) for it, rather than stretching
+`TDSTransaction` to mean something it doesn't, or building a second full TDS subsystem.
+
+**Business income is computed, never stored as its own ledger.** Phase 3's `SalesInvoice`/
+`PurchaseInvoice` are never auto-posted to `JournalEntryLine`s in this codebase (see
+`ReportService.trial_balance`'s own docstring) — so `BusinessIncomeCalculationService` sums
+posted invoice/note totals *and* posted journal movement on `INCOME`/`EXPENSE` ledgers as
+two genuinely separate, non-overlapping data sources, nets them into book profit, then adds
+back only the ledgers a human has explicitly classified `DISALLOWABLE` via the thin
+`IncomeTaxLedgerClassification` side table (never inferred from a ledger's name) plus any
+itemized `IncomeTaxAdjustment` rows. An unclassified expense ledger is deducted at book
+value by default and separately flagged for review — the engine never guesses a
+disallowance against the taxpayer's favor either.
+
+**A deduction's claimed amount is never what the computation uses.** `IncomeTaxDeduction`
+stores `claimed_amount` and a display-default `eligible_amount`; the actual figure that
+enters a computation is always recomputed fresh by `DeductionService.eligible_amount_for()`
+against that computation's own rule set — checking whether the section is allowed under the
+regime at all, then capping at the rule's `max_amount` — the same "system's answer is
+authoritative, never the raw input" principle `TDSTransaction.system_calculated_amount`
+already established.
+
+**Surcharge is computed without marginal relief, and says so.** `IncomeTaxSurchargeRule`
+gives a flat rate once an income threshold is crossed; real marginal relief (capping the
+surcharge so it never exceeds the excess income over the threshold) is a materially larger
+piece of tax logic this cut does not implement. Crossing a threshold instead raises a
+`WARNING` validation item prompting a human to check it manually — flagged, never guessed.
+
+**Loss carry-forward is tracked, not yet auto-consumed.** `IncomeTaxLoss` records a loss's
+origin year, amount, and a human-entered `setoff_amount` for the *current* year only —
+`carried_forward_amount` (`amount - setoff_amount`) is always visible, but automatically
+re-applying that balance against a *future* year's computation is a deliberately deferred
+next iteration; real set-off ordering rules (a capital loss can only offset a capital gain;
+a business loss cannot offset salary) are intricate enough that guessing them silently
+risked being wrong in a way a human wouldn't easily catch.
+
+**Everything is reviewed through Phase 7, never a parallel review system.** A tax
+computation or ITR preparation is just another company record an `AuditFinding` can point
+at — `AuditFindingCategory`/`AuditFindingSourceType` gained a handful of Phase 8 values
+(`TAX_COMPUTATION`, `ITR_PREPARATION`, `TAX_DEDUCTION`, `CAPITAL_GAIN`, `TAX_CREDIT_ENTRY`,
+...) the same way they gained Bank values in Phase 6, kept to 20 characters or fewer so the
+existing `audit_findings.source_type` column never needed an `ALTER`.
+
+**ITR form-type is determined, not asserted, and can honestly say "I don't know."**
+`determine_itr_form_type()` maps `COMPANY → ITR_6`, `PARTNERSHIP`/`LLP → ITR_5`,
+`TRUST → ITR_7`, and `INDIVIDUAL`/`HUF` to `ITR_1`/`ITR_2`/`ITR_3` based on which income
+heads are actually present — anything it can't confidently place resolves to
+`NOT_DETERMINED`, which `ITRValidationService` surfaces as a `REVIEW_REQUIRED` item rather
+than a guess. Approving an ITR preparation is the one hard validation gate in Phase 8:
+`ITRPreparationService.approve()` re-runs validation and refuses if any `ERROR`-severity
+issue (missing PAN, no active bank account, ...) remains — the same "flag and block, never
+rubber-stamp" principle `AuditEngagementService._check_can_approve()` already applies.
+
+## 22. Future Module Roadmap
 
 These remain route-namespace placeholders only, ready for a future module to fill in
-without touching Phases 1–7 (`/income-tax`, `/compliance`, `/tally`, `/integrations`):
+without touching Phases 1–8 (`/compliance`, `/tally`, `/integrations`):
 
 | Phase | Module |
 |---|---|
@@ -1086,7 +1228,8 @@ without touching Phases 1–7 (`/income-tax`, `/compliance`, `/tally`, `/integra
 | 5 | TDS Compliance — deductees, rule engine, transactions, challans, reconciliation, quarterly returns *(done — no TRACES/portal filing)* |
 | 6 | Bank Reconciliation — statement import, deterministic matching engine, manual/partial matching, adjustments, review workflow *(done — no live bank connection, no AI)* |
 | 7 | CA/Auditor Workflow — engagements, assignments, checklist, findings, evidence, response/review, sign-off *(done — no AI, no statutory certification)* |
-| — | Income Tax preparation support, OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter`/`OpenBankingProvider` for an eventual real filing/bank-feed integration, Compliance calendar, live Tally API integration |
+| 8 | Income Tax Compliance Engine — tax profile, versioned tax rules, income/deductions/capital gains, business income from accounting data, tax credits, computation, ITR preparation, validation *(done — no e-filing, no AI, no marginal relief)* |
+| — | OCR/data extraction (`DocumentProcessor` extension point), a `GSTPortalAdapter`/`TDSPortalAdapter`/`IncomeTaxPortalAdapter`/`OpenBankingProvider` for an eventual real filing/bank-feed integration, Compliance calendar, live Tally API integration, surcharge marginal relief, automatic loss carry-forward set-off |
 
 Each future module is expected to live in its own `models/ schemas/ services/
 repositories/ api/` subtree (per `app/core/permissions.py`'s module grouping), reusing —
@@ -1097,7 +1240,7 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
 
 ---
 
-## 22. Key Architectural Decisions
+## 23. Key Architectural Decisions
 
 - **Modular monolith, not microservices.** One deployable backend, cleanly layered, so
   future modules are new packages inside `app/`, not new services to operate.
@@ -1235,10 +1378,25 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
   inside the same transition path every other action goes through, so "did anyone check for
   open critical findings before approving" is a guarantee the code makes, not a step a busy
   reviewer might skip.
+- **`IncomeTaxCreditEntry` is a new model, not a reuse of `TDSTransaction`** (Phase 8) —
+  they represent tax moving in opposite directions (deducted by this company vs. deducted
+  from this company); reusing one table for both would have made every downstream query
+  ambiguous about which direction a row meant.
+- **The Income Tax calculator is pure functions over a caller-supplied rule set, with no
+  DB access of its own** (Phase 8) — `income_tax_calculator.py`'s `compute_slab_tax`/
+  `compute_rebate`/`compute_surcharge`/`compute_cess` take plain `Decimal`s and rule-set
+  rows in, return a result out, and are unit-tested directly against fixtures rather than
+  through the full computation service — the same reason `TaxCalculationService`
+  (Phase 5) and `GSTCalculationService` (Phase 4) were kept side-effect-free.
+- **A deduction's stored `eligible_amount` is a display default, never the figure a
+  computation trusts** (Phase 8) — `IncomeTaxComputationService.calculate()` always
+  recomputes eligibility fresh against its own rule set via
+  `DeductionService.eligible_amount_for()`, so a deduction entered before a regime was
+  even chosen can never silently carry a stale eligibility figure into the final tax.
 
 ---
 
-## 23. Security Notes
+## 24. Security Notes
 
 - Passwords are hashed with **Argon2id** (`argon2-cffi`), never stored or logged in
   plaintext.

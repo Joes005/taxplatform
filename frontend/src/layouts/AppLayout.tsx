@@ -23,6 +23,7 @@ import {
   Wallet,
   UserRound,
   GitMerge,
+  Banknote,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -82,6 +83,16 @@ const BANK_NAV_ITEMS = [
 const AUDIT_NAV_ITEMS = [
   { to: "/audits", label: "Dashboard", icon: ClipboardCheck },
   { to: "/audits/engagements", label: "Engagements", icon: ClipboardCheck },
+];
+
+const INCOME_TAX_NAV_ITEMS = [
+  { to: "/income-tax", label: "Dashboard", icon: Banknote },
+  { to: "/income-tax/profile", label: "Tax Profile", icon: Banknote },
+  { to: "/income-tax/income", label: "Income", icon: Wallet },
+  { to: "/income-tax/capital-gains", label: "Capital Gains", icon: Receipt },
+  { to: "/income-tax/deductions", label: "Deductions", icon: Layers },
+  { to: "/income-tax/payments", label: "Tax Payments", icon: Wallet },
+  { to: "/income-tax/computations", label: "Computations", icon: Receipt },
 ];
 
 export function AppLayout() {
@@ -218,9 +229,31 @@ export function AppLayout() {
               {item.label}
             </NavLink>
           ))}
+
+          <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Income Tax
+          </p>
+          {INCOME_TAX_NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/income-tax"}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )
+              }
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         <div className="border-t border-border p-3 text-xs text-muted-foreground">
-          Phase 7 · CA/Auditor Workflow
+          Phase 8 · Income Tax Compliance Engine
         </div>
       </aside>
 

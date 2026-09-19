@@ -38,7 +38,16 @@ from app.api import (
     gstr3b,
     health,
     imports,
+    income_tax_capital_gains,
+    income_tax_computations,
+    income_tax_deductions,
+    income_tax_income,
+    income_tax_losses,
+    income_tax_payments,
+    income_tax_profile,
+    income_tax_reports,
     itc,
+    itr_preparations,
     journal_entries,
     ledgers,
     opening_balances,
@@ -187,3 +196,12 @@ app.include_router(audit_checklists.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_findings.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_reviews.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_profile.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_income.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_capital_gains.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_deductions.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_losses.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_payments.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_computations.router, prefix=settings.API_V1_PREFIX)
+app.include_router(itr_preparations.router, prefix=settings.API_V1_PREFIX)
+app.include_router(income_tax_reports.router, prefix=settings.API_V1_PREFIX)
