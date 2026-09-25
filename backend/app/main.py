@@ -24,6 +24,7 @@ from app.api import (
     bank_reports,
     bank_statements,
     bank_transactions,
+    bi_reports,
     companies,
     compliance_calendar,
     compliance_obligations,
@@ -246,4 +247,5 @@ app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
 app.include_router(action_center.router, prefix=settings.API_V1_PREFIX)
 app.include_router(search.router, prefix=settings.API_V1_PREFIX)
+app.include_router(bi_reports.router, prefix=settings.API_V1_PREFIX)
 

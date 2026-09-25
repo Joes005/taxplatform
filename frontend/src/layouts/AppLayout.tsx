@@ -49,6 +49,7 @@ import {
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/action-center", label: "Action Center", icon: ShieldAlert },
+  { to: "/reports", label: "Report Center", icon: BarChart3 },
   { to: "/companies", label: "Companies", icon: Building2 },
   { to: "/documents", label: "Documents", icon: FileText },
   { to: "/users", label: "Users", icon: Users },

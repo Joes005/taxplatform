@@ -9,6 +9,8 @@
 **Phase 7 — CA/Auditor Workflow (Engagements, Findings, Evidence, Review, Sign-off)**
 **Phase 8 — Income Tax Compliance Engine (Computation, Tax Credits, ITR Preparation, Validation)**
 **Phase 9 — Compliance Calendar & Task Management (Obligations, Tasks, Notifications)**
+**Phase 10 — Business Workflow & UX Intelligence (Dashboard, Action Center, Pipeline, Global Search)**
+**Phase 11 — Reports & Business Intelligence (Report Center, Financial, Tax, Banking, Audit, Management BI)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -1596,4 +1598,66 @@ Phase 10 transforms the platform from a collection of isolated compliance module
 - **Zero Regressions**: 369/369 tests pass (364 baseline + 5 Phase 10 tests).
 - **Migration Head**: `21f14d138a81` (no schema change required; workflow states are derived directly from existing domain models).
 - **External Integrations**: Live portal integrations remain adapter-ready only.
+
+---
+
+## 27. Phase 11 — Reports & Business Intelligence
+
+Phase 11 transforms raw transactional and compliance data across all modules into authoritative, auditable, drill-down business intelligence.
+
+### 1. Architectural Highlights
+- **Centralized Report Center (`/reports`)**:
+  - Organizes reporting into 6 structured domains: Management, Financial, Tax & GST, Banking, Audit, and Compliance.
+  - Interactive search, domain tagging, quick access, and direct deep-linking.
+- **Executive BI Cockpit (`/reports/management`)**:
+  - Executive KPI cards: Revenue, Costs, Net Profit, Receivables, Payables, Bank Position, Net GST, TDS Payable, Open Findings, Overdue Tasks.
+  - Prior Period / Prior FY comparison with safe zero-division handling (`N/A`).
+  - Top Debtors & Creditors with direct drill-down links to invoices.
+- **Financial Reports (`/reports/financial`)**:
+  - **Standardized Trial Balance**: Opening Dr/Cr, Period Dr/Cr, Closing Dr/Cr. Total Debit == Total Credit integrity verification with visible warning banner.
+  - **Profit & Loss Statement**: Revenue, Cost of Sales, Gross Profit, Operating Expenses, Operating Profit, Other Income/Expenses, Profit Before Tax, Tax Expense, Net Profit. Explicit classification warnings when ledgers lack mapping.
+  - **Balance Sheet**: Assets, Liabilities, and Equity (including retained earnings from P&L). Real-time Assets == Liabilities + Equity balance verification.
+  - **General Ledger (`/reports/general-ledger`)**: Running balance, voucher type badges, date constraints, and direct link to underlying transaction.
+  - **Receivables & Payables Outstanding**: Full customer and vendor registers respecting Phase 9.6 formula (`Net Invoiced = Invoice + Debit Note - Credit Note`, `Outstanding = Net Invoiced - Receipts/Payments`).
+  - **Ageing Analysis**: Receivable & Payable ageing bucketed into `CURRENT`, `1_30`, `31_60`, `61_90`, `91_180`, and `181_PLUS` days. Explicit fallback to invoice date when due date is unavailable.
+  - **Sales & Purchase Analytics**: Monthly trends, GST tax slabs distribution, and party contribution percentages.
+- **Tax & Statutory Intelligence (`/reports/tax`)**:
+  - **GST Summary**: Outward supplies, CGST/SGST/IGST/Cess liability, eligible input tax credit (ITC), and net payable position.
+  - **TDS Intelligence**: Section-wise transaction counts, gross amount, TDS calculated, deducted, paid, and payable. Full challan deposit and allocation tracking.
+  - **Income Tax Summary**: Breakdown by head of income, chapter VI-A deductions, rebate 87A, surcharge, cess, and final net tax liability/refund.
+- **Audit & Compliance Intelligence**:
+  - **Audit Engagements & Findings**: Open vs completed engagements, checklist completion percentage, critical findings, and pending auditor review items.
+  - **Compliance Status**: Category-wise distribution, overdue obligations, and tasks due soon.
+- **Universal Report Filter System (`ReportFilterBar`)**:
+  - Reusable filter component with FY selection, quick presets (This FY, Q1, Q2, Q3, Q4, Last Month, Custom), date range pickers, As Of date, and comparison toggle.
+  - URL query synchronization (`/reports/financial?tab=profit-loss&date_from=2025-04-01&date_to=2025-09-30`) allowing stateful sharing and reopening.
+- **Standardized Export Engine**:
+  - Dual CSV and XLSX export powered by server-side `render_export` utility.
+  - Auditable export logging (`REPORT_EXPORT_GENERATED`).
+  - Strict tenant and permission enforcement on all exports.
+
+### 2. Backend Endpoints
+- `GET /api/v1/reports/management`: Executive KPI summary with prior period comparisons.
+- `GET /api/v1/reports/trial-balance`: Standardized double-entry trial balance.
+- `GET /api/v1/reports/profit-loss`: Multi-step P&L with COGS and operating profit.
+- `GET /api/v1/reports/balance-sheet`: Reconciled balance sheet statement.
+- `GET /api/v1/reports/general-ledger`: Detailed ledger entry register with running balance.
+- `GET /api/v1/reports/receivables`: Customer-level receivables outstanding.
+- `GET /api/v1/reports/payables`: Vendor-level payables outstanding.
+- `GET /api/v1/reports/ageing`: 6-bucket ageing analysis for debtors or creditors.
+- `GET /api/v1/reports/sales`: Sales and purchase analytics with GST distribution.
+- `GET /api/v1/reports/cash-bank`: Bank account summary and reconciliation overview.
+- `GET /api/v1/reports/gst`: GST outward, ITC, and net tax position summary.
+- `GET /api/v1/reports/tds`: TDS deduction and challan allocation summary.
+- `GET /api/v1/reports/income-tax`: Income tax calculation breakdown summary.
+- `GET /api/v1/reports/audit`: Audit engagement and checklist progress summary.
+- `GET /api/v1/reports/compliance`: Compliance task health and category distribution.
+- `GET /api/v1/reports/export`: Standardized CSV / XLSX report file downloads.
+
+### 3. Verification & Quality Gates
+- **Total Backend Tests**: 377 / 377 PASS (369 frozen baseline + 8 comprehensive Phase 11 integration tests).
+- **Frontend Quality**: TypeScript passed with zero errors; ESLint clean; Vite production bundle built successfully.
+- **Migration Head**: `21f14d138a81` (no schema change; all reports derived cleanly from existing domain models).
+- **Tenant Isolation**: Cross-tenant direct API requests return `403 Forbidden`.
+
 

@@ -73,6 +73,13 @@ import ComplianceObligationsPage from "@/pages/compliance/ComplianceObligationsP
 import NotificationsPage from "@/pages/compliance/NotificationsPage";
 import OpeningBalancesPage from "@/pages/accounting/OpeningBalancesPage";
 
+import ReportCenterPage from "@/pages/reports/ReportCenterPage";
+import ManagementDashboardPage from "@/pages/reports/ManagementDashboardPage";
+import FinancialReportsPage from "@/pages/reports/FinancialReportsPage";
+import GeneralLedgerPage from "@/pages/reports/GeneralLedgerPage";
+import TaxComplianceReportsPage from "@/pages/reports/TaxComplianceReportsPage";
+import BankingReportsPage from "@/pages/reports/BankingReportsPage";
+
 export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
@@ -144,6 +151,14 @@ export const router = createBrowserRouter([
           { path: "/compliance/tasks/:taskId", element: <ComplianceTaskDetailPage /> },
           { path: "/compliance/obligations", element: <ComplianceObligationsPage /> },
           { path: "/notifications", element: <NotificationsPage /> },
+          { path: "/reports", element: <ReportCenterPage /> },
+          { path: "/reports/management", element: <ManagementDashboardPage /> },
+          { path: "/reports/financial", element: <FinancialReportsPage /> },
+          { path: "/reports/general-ledger", element: <GeneralLedgerPage /> },
+          { path: "/reports/tax", element: <TaxComplianceReportsPage /> },
+          { path: "/reports/banking", element: <BankingReportsPage /> },
+          { path: "/reports/audit", element: <TaxComplianceReportsPage /> },
+          { path: "/reports/compliance", element: <TaxComplianceReportsPage /> },
         ],
       },
     ],
