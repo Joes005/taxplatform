@@ -33,6 +33,23 @@ async def create_company(
     return SuccessResponse(data=CompanyRead.model_validate(company), message="Company created")
 
 
+@router.post("/onboard", response_model=SuccessResponse[CompanyRead], status_code=201)
+async def onboard_company(
+    payload: CompanyCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    meta: RequestMeta = Depends(get_request_meta),
+):
+    from app.services.company_initialization_service import CompanyInitializationService
+
+    init_service = CompanyInitializationService(db)
+    company = await init_service.initialize_new_company(payload, current_user, meta)
+    await db.commit()
+    return SuccessResponse(
+        data=CompanyRead.model_validate(company), message="Company onboarded successfully"
+    )
+
+
 @router.get("", response_model=SuccessResponse[PaginatedData[CompanyRead]])
 async def list_companies(
     page: int = Query(default=1, ge=1),

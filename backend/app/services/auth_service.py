@@ -4,7 +4,12 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.exceptions import AuthenticationError, DuplicateResourceError, PermissionDeniedError
+from app.core.exceptions import (
+    AuthenticationError,
+    DuplicateResourceError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 from app.core.permissions import ALL_PERMISSION_CODES
 from app.core.security import (
     create_access_token,
@@ -16,6 +21,7 @@ from app.core.security import (
 from app.models.membership import MembershipStatus
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
+from app.repositories.company_repository import CompanyRepository
 from app.repositories.membership_repository import MembershipRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.role_repository import RoleRepository
@@ -41,6 +47,7 @@ class AuthService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.users = UserRepository(db)
+        self.companies = CompanyRepository(db)
         self.memberships = MembershipRepository(db)
         self.roles = RoleRepository(db)
         self.refresh_tokens = RefreshTokenRepository(db)
@@ -93,6 +100,19 @@ class AuthService:
             for m in memberships
         ]
 
+        if user.is_platform_super_admin and not company_summaries:
+            all_comps, _ = await self.companies.list_all(offset=0, limit=50)
+            company_summaries = [
+                MembershipCompanySummary(
+                    company_id=c.id,
+                    company_name=c.legal_name,
+                    role_code="SUPER_ADMIN",
+                    role_name="Platform Super Admin",
+                    status="ACTIVE",
+                )
+                for c in all_comps
+            ]
+
         active_company: ActiveCompanyContext | None = None
         if len(memberships) == 1:
             m = memberships[0]
@@ -103,6 +123,15 @@ class AuthService:
                 role_code=m.role.code,
                 role_name=m.role.name,
                 permissions=permissions,
+            )
+        elif user.is_platform_super_admin and len(company_summaries) == 1:
+            c = company_summaries[0]
+            active_company = ActiveCompanyContext(
+                company_id=c.company_id,
+                company_name=c.company_name,
+                role_code="SUPER_ADMIN",
+                role_name="Platform Super Admin",
+                permissions=[code.value for code in ALL_PERMISSION_CODES],
             )
 
         return LoginResponse(
@@ -219,6 +248,30 @@ class AuthService:
             user_id=user.id, company_id=company_id
         )
         if membership is None:
+            if user.is_platform_super_admin:
+                company = await self.companies.get_by_id(company_id)
+                if company is None:
+                    raise NotFoundError("Company not found")
+                if not company.is_active:
+                    raise PermissionDeniedError("This company is not active")
+                permissions = [code.value for code in ALL_PERMISSION_CODES]
+                await self.audit.log(
+                    action=AuditAction.COMPANY_SWITCH,
+                    user_id=user.id,
+                    company_id=company_id,
+                    resource_type="company",
+                    resource_id=str(company_id),
+                    description=f"Super admin {user.email} switched active company",
+                    ip_address=meta.ip_address,
+                    user_agent=meta.user_agent,
+                )
+                return ActiveCompanyContext(
+                    company_id=company.id,
+                    company_name=company.legal_name,
+                    role_code="SUPER_ADMIN",
+                    role_name="Platform Super Admin",
+                    permissions=permissions,
+                )
             raise PermissionDeniedError("You are not a member of this company")
         if not membership.company.is_active:
             raise PermissionDeniedError("This company is not active")

@@ -13,10 +13,8 @@ from app.core.exceptions import NotFoundError, ValidationAppError
 from app.repositories.tds_profile_repository import TDSProfileRepository
 from app.repositories.tds_reconciliation_repository import TDSReconciliationRepository
 from app.repositories.tds_return_period_repository import TDSReturnPeriodRepository
-from app.services.gst_export_service import ExportFile, ExportSection, write_csv, write_xlsx
 from app.services.tds_report_service import TDSReportService
-
-ExportFormat = Literal["csv", "xlsx"]
+from app.utils.export import ExportFile, ExportFormat, ExportSection, write_csv, write_xlsx
 
 
 class TDSExportService:

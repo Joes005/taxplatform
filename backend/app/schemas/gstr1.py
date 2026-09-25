@@ -46,6 +46,22 @@ class GSTR1B2COthersRow(BaseModel):
     cess_amount: Decimal
 
 
+class GSTR1ExportRow(BaseModel):
+    sales_invoice_id: uuid.UUID
+    export_type: str
+    recipient_name: str | None = None
+    recipient_gstin: str | None = None
+    invoice_number: str
+    invoice_date: date
+    invoice_value: Decimal
+    port_code: str | None = None
+    shipping_bill_number: str | None = None
+    shipping_bill_date: date | None = None
+    taxable_value: Decimal
+    igst_amount: Decimal
+    cess_amount: Decimal
+
+
 class GSTR1NoteRow(BaseModel):
     note_id: uuid.UUID
     note_number: str

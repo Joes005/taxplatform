@@ -68,7 +68,9 @@ import ComplianceDashboardPage from "@/pages/compliance/ComplianceDashboardPage"
 import ComplianceCalendarPage from "@/pages/compliance/ComplianceCalendarPage";
 import ComplianceTasksPage from "@/pages/compliance/ComplianceTasksPage";
 import ComplianceTaskDetailPage from "@/pages/compliance/ComplianceTaskDetailPage";
+import ComplianceObligationsPage from "@/pages/compliance/ComplianceObligationsPage";
 import NotificationsPage from "@/pages/compliance/NotificationsPage";
+import OpeningBalancesPage from "@/pages/accounting/OpeningBalancesPage";
 
 export const router = createBrowserRouter([
   {
@@ -103,6 +105,7 @@ export const router = createBrowserRouter([
           { path: "/accounting/purchase-invoices/new", element: <PurchaseInvoiceFormPage /> },
           { path: "/accounting/purchase-invoices/:invoiceId", element: <PurchaseInvoiceDetailPage /> },
           { path: "/accounting/transactions", element: <OtherTransactionsPage /> },
+          { path: "/accounting/opening-balances", element: <OpeningBalancesPage /> },
           { path: "/accounting/imports", element: <ImportsPage /> },
           { path: "/accounting/imports/new", element: <ImportWizardPage /> },
           { path: "/accounting/imports/:jobId", element: <ImportDetailPage /> },
@@ -137,6 +140,7 @@ export const router = createBrowserRouter([
           { path: "/compliance/calendar", element: <ComplianceCalendarPage /> },
           { path: "/compliance/tasks", element: <ComplianceTasksPage /> },
           { path: "/compliance/tasks/:taskId", element: <ComplianceTaskDetailPage /> },
+          { path: "/compliance/obligations", element: <ComplianceObligationsPage /> },
           { path: "/notifications", element: <NotificationsPage /> },
         ],
       },

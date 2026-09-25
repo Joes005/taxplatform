@@ -43,12 +43,13 @@ import type { HousePropertyType } from "@/types/incomeTax";
 
 export default function IncomeTaxIncomePage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: financialYears } = useFinancialYears(companyId);
   const [fyId, setFyId] = useState<string>("");
   const effectiveFyId = fyId || financialYears?.items.find((fy) => fy.is_current)?.id || "";
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Landmark} />;
 
   return (
     <div className="space-y-6">

@@ -59,23 +59,24 @@ export default function TaxComputationDetailPage() {
   const { computationId } = useParams<{ computationId: string }>();
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <Receipt className="h-6 w-6" />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: computation, isLoading } = useTaxComputation(companyId, computationId);
-  const calculate = useCalculateTaxComputation(companyId, computationId ?? "");
-  const submitForReview = useSubmitTaxComputationForReview(companyId, computationId ?? "");
-  const approve = useApproveTaxComputation(companyId, computationId ?? "");
-  const lock = useLockTaxComputation(companyId, computationId ?? "");
-  const cancel = useCancelTaxComputation(companyId, computationId ?? "");
+  const calculate = useCalculateTaxComputation(companyId ?? "", computationId ?? "");
+  const submitForReview = useSubmitTaxComputationForReview(companyId ?? "", computationId ?? "");
+  const approve = useApproveTaxComputation(companyId ?? "", computationId ?? "");
+  const lock = useLockTaxComputation(companyId ?? "", computationId ?? "");
+  const cancel = useCancelTaxComputation(companyId ?? "", computationId ?? "");
 
   const { data: preparations } = useItrPreparations(companyId);
-  const createItr = useCreateItrPreparation(companyId);
-  const preparation = preparations?.items.find((p) => p.tax_computation_id === computationId);
+  const createItr = useCreateItrPreparation(companyId ?? "");
 
   const [downloading, setDownloading] = useState(false);
 
+  if (!activeCompany || !companyId) return <Receipt className="h-6 w-6" />;
   if (isLoading || !computation || !computationId) return <Skeleton className="h-96 w-full" />;
+
+  const preparation = preparations?.items.find((p) => p.tax_computation_id === computationId);
 
   const run = async (action: () => Promise<unknown>, message: string) => {
     try {

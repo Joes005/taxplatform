@@ -32,10 +32,10 @@ const PERIOD_STATUS_VARIANT: Record<GSTReturnPeriodStatus, "secondary" | "warnin
 export default function GstReturnPeriodDetailPage() {
   const { periodId } = useParams<{ periodId: string }>();
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={ShieldCheck} />;
-
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
   const { data: period, isLoading } = useGstReturnPeriod(companyId, periodId);
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={ShieldCheck} />;
 
   if (isLoading || !period || !periodId) {
     return <Skeleton className="h-64 w-full" />;

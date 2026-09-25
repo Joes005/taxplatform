@@ -62,10 +62,10 @@ const SNAPSHOT_STATUS_VARIANT: Record<TDSReturnSnapshotStatus, "secondary" | "wa
 export default function TdsReturnPeriodDetailPage() {
   const { periodId } = useParams<{ periodId: string }>();
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
   const { data: period, isLoading } = useTdsReturnPeriod(companyId, periodId);
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Landmark} />;
 
   if (isLoading || !period || !periodId) {
     return <Skeleton className="h-64 w-full" />;

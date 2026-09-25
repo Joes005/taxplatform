@@ -22,8 +22,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function ComplianceCalendarPage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={CalendarClock} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -36,6 +35,8 @@ export default function ComplianceCalendarPage() {
     (data ?? []).forEach((day) => map.set(day.date, day));
     return map;
   }, [data]);
+
+  if (!activeCompany) return <EmptyCompanyState icon={CalendarClock} />;
 
   const firstOfMonth = new Date(year, month - 1, 1);
   const daysInMonth = new Date(year, month, 0).getDate();

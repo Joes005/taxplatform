@@ -27,6 +27,8 @@ class CustomerCreate(BaseModel):
     state: str | None = Field(default=None, max_length=100)
     state_code: str | None = Field(default=None, max_length=2)
     pincode: str | None = Field(default=None, max_length=10)
+    is_sez: bool = False
+    is_export: bool = False
 
     @field_validator("gstin")
     @classmethod
@@ -47,6 +49,8 @@ class CustomerUpdate(BaseModel):
     state_code: str | None = Field(default=None, max_length=2)
     pincode: str | None = Field(default=None, max_length=10)
     is_active: bool | None = None
+    is_sez: bool | None = None
+    is_export: bool | None = None
 
     @field_validator("gstin")
     @classmethod
@@ -70,5 +74,7 @@ class CustomerRead(BaseModel):
     state_code: str | None
     pincode: str | None
     is_active: bool
+    is_sez: bool = False
+    is_export: bool = False
     created_at: datetime
     updated_at: datetime

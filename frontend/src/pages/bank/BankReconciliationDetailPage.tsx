@@ -50,18 +50,17 @@ export default function BankReconciliationDetailPage() {
   const { reconciliationId } = useParams<{ reconciliationId: string }>();
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: reconciliation, isLoading } = useBankReconciliation(companyId, reconciliationId);
   const { data: summary } = useBankReconciliationSummary(companyId, reconciliationId);
 
-  const runMatching = useRunBankMatching(companyId, reconciliationId ?? "");
-  const submit = useSubmitBankReconciliation(companyId, reconciliationId ?? "");
-  const approve = useApproveBankReconciliation(companyId, reconciliationId ?? "");
-  const reject = useRejectBankReconciliation(companyId, reconciliationId ?? "");
-  const lock = useLockBankReconciliation(companyId, reconciliationId ?? "");
-  const cancel = useCancelBankReconciliation(companyId, reconciliationId ?? "");
+  const runMatching = useRunBankMatching(companyId ?? "", reconciliationId ?? "");
+  const submit = useSubmitBankReconciliation(companyId ?? "", reconciliationId ?? "");
+  const approve = useApproveBankReconciliation(companyId ?? "", reconciliationId ?? "");
+  const reject = useRejectBankReconciliation(companyId ?? "", reconciliationId ?? "");
+  const lock = useLockBankReconciliation(companyId ?? "", reconciliationId ?? "");
+  const cancel = useCancelBankReconciliation(companyId ?? "", reconciliationId ?? "");
 
   const { data: openTransactions, isLoading: txnsLoading } = useBankTransactions(companyId, 1, {
     bankAccountId: reconciliation?.bank_account_id,
@@ -70,6 +69,7 @@ export default function BankReconciliationDetailPage() {
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Landmark} />;
   if (isLoading || !reconciliation || !reconciliationId) return <Skeleton className="h-64 w-full" />;
 
   const run = async (action: () => Promise<unknown>, message: string) => {

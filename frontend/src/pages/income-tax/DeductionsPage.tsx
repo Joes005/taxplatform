@@ -30,21 +30,22 @@ type FormValues = z.infer<typeof schema>;
 export default function DeductionsPage() {
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: financialYears } = useFinancialYears(companyId);
   const [fyId, setFyId] = useState<string>("");
   const effectiveFyId = fyId || financialYears?.items.find((fy) => fy.is_current)?.id || "";
 
   const { data, isLoading } = useDeductions(companyId, effectiveFyId || undefined);
-  const createMutation = useCreateDeduction(companyId);
-  const deleteMutation = useDeleteDeduction(companyId);
+  const createMutation = useCreateDeduction(companyId ?? "");
+  const deleteMutation = useDeleteDeduction(companyId ?? "");
   const [open, setOpen] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Landmark} />;
 
   const onSubmit = async (values: FormValues) => {
     try {

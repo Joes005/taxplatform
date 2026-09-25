@@ -47,8 +47,7 @@ export default function ComplianceTaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <CalendarClock className="h-6 w-6" />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: task, isLoading } = useComplianceTask(companyId, taskId);
   const { data: comments } = useComplianceTaskComments(companyId, taskId);
@@ -56,22 +55,23 @@ export default function ComplianceTaskDetailPage() {
   const { data: companyUsers } = useCompanyUsers(companyId);
   const { data: documents } = useDocuments(companyId ? { companyId, pageSize: 100 } : null);
 
-  const start = useStartComplianceTask(companyId, taskId ?? "");
-  const submitReview = useSubmitComplianceTaskForReview(companyId, taskId ?? "");
-  const complete = useCompleteComplianceTask(companyId, taskId ?? "");
-  const verify = useVerifyComplianceTask(companyId, taskId ?? "");
-  const returnForChanges = useReturnComplianceTaskForChanges(companyId, taskId ?? "");
-  const cancel = useCancelComplianceTask(companyId, taskId ?? "");
-  const lock = useLockComplianceTask(companyId, taskId ?? "");
-  const addComment = useAddComplianceTaskComment(companyId, taskId ?? "");
-  const addEvidence = useAddComplianceTaskEvidence(companyId, taskId ?? "");
-  const removeEvidence = useRemoveComplianceTaskEvidence(companyId, taskId ?? "");
+  const start = useStartComplianceTask(companyId ?? "", taskId ?? "");
+  const submitReview = useSubmitComplianceTaskForReview(companyId ?? "", taskId ?? "");
+  const complete = useCompleteComplianceTask(companyId ?? "", taskId ?? "");
+  const verify = useVerifyComplianceTask(companyId ?? "", taskId ?? "");
+  const returnForChanges = useReturnComplianceTaskForChanges(companyId ?? "", taskId ?? "");
+  const cancel = useCancelComplianceTask(companyId ?? "", taskId ?? "");
+  const lock = useLockComplianceTask(companyId ?? "", taskId ?? "");
+  const addComment = useAddComplianceTaskComment(companyId ?? "", taskId ?? "");
+  const addEvidence = useAddComplianceTaskEvidence(companyId ?? "", taskId ?? "");
+  const removeEvidence = useRemoveComplianceTaskEvidence(companyId ?? "", taskId ?? "");
 
   const [commentText, setCommentText] = useState("");
   const [completionNotes, setCompletionNotes] = useState("");
   const [returnReason, setReturnReason] = useState("");
   const [evidenceDoc, setEvidenceDoc] = useState("");
 
+  if (!activeCompany || !companyId) return <CalendarClock className="h-6 w-6" />;
   if (isLoading || !task || !taskId) return <Skeleton className="h-96 w-full" />;
 
   const run = async (action: () => Promise<unknown>, message: string) => {

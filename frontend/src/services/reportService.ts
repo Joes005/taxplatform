@@ -23,4 +23,21 @@ export const reportService = {
     if (asOf) params.set("as_of", asOf);
     return apiClient.get<TrialBalance>(`/accounting/reports/trial-balance?${params.toString()}`);
   },
+  exportSalesRegister: (companyId: string, format: "csv" | "xlsx" = "csv", dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams({ company_id: companyId, format });
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    return apiClient.downloadBlob(`/accounting/reports/sales-register/export?${params.toString()}`);
+  },
+  exportPurchaseRegister: (companyId: string, format: "csv" | "xlsx" = "csv", dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams({ company_id: companyId, format });
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    return apiClient.downloadBlob(`/accounting/reports/purchase-register/export?${params.toString()}`);
+  },
+  exportTrialBalance: (companyId: string, format: "csv" | "xlsx" = "csv", asOf?: string) => {
+    const params = new URLSearchParams({ company_id: companyId, format });
+    if (asOf) params.set("as_of", asOf);
+    return apiClient.downloadBlob(`/accounting/reports/trial-balance/export?${params.toString()}`);
+  },
 };

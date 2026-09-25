@@ -12,6 +12,7 @@ from app.schemas.gstr1 import (
     GSTR1B2CLargeRow,
     GSTR1B2COthersRow,
     GSTR1DocumentSummaryRow,
+    GSTR1ExportRow,
     GSTR1HSNRow,
     GSTR1NoteRow,
     GSTR1Overview,
@@ -68,7 +69,7 @@ async def get_gstr1_b2c_others(
     return SuccessResponse(data=await service.get_b2c_others(company_id, period_id))
 
 
-@router.get("/exports", response_model=SuccessResponse[list])
+@router.get("/exports", response_model=SuccessResponse[list[GSTR1ExportRow]])
 async def get_gstr1_exports(
     period_id: uuid.UUID,
     company_id: uuid.UUID,

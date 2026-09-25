@@ -26,7 +26,16 @@ class GSTTransactionClassificationService:
         customer_gstin: str | None,
         customer_state_code: str | None,
         place_of_supply_state_code: str | None,
+        is_export: bool = False,
+        is_sez: bool = False,
+        export_type: str | None = None,
     ) -> GSTClassificationResult:
+        if is_export or (export_type in ("WITH_PAYMENT", "WITHOUT_PAYMENT", "DEEMED_EXPORT")):
+            return GSTClassificationResult(category=GSTTransactionCategory.EXPORT)
+
+        if is_sez or (export_type in ("SEZ_WITH_PAYMENT", "SEZ_WITHOUT_PAYMENT")):
+            return GSTClassificationResult(category=GSTTransactionCategory.SEZ)
+
         if not place_of_supply_state_code:
             return GSTClassificationResult(
                 category=GSTTransactionCategory.REVIEW_REQUIRED,

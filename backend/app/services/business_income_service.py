@@ -16,7 +16,7 @@ import uuid
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError, ValidationAppError
@@ -118,6 +118,13 @@ class BusinessIncomeCalculationService:
                     JournalEntry.financial_year_id == financial_year_id,
                     JournalEntry.status == TransactionStatus.POSTED,
                     Ledger.ledger_type.in_([LedgerType.INCOME, LedgerType.EXPENSE]),
+                    or_(
+                        JournalEntry.source_reference.is_(None),
+                        and_(
+                            ~JournalEntry.source_reference.startswith("sales_invoice"),
+                            ~JournalEntry.source_reference.startswith("purchase_invoice"),
+                        ),
+                    ),
                 )
                 .group_by(Ledger.id, Ledger.ledger_type)
             )

@@ -22,20 +22,10 @@ class CompanyService:
     async def create_company(
         self, payload: CompanyCreate, current_user: User, meta: RequestMeta
     ) -> Company:
-        company = Company(**payload.model_dump())
-        await self.companies.create(company)
+        from app.services.company_initialization_service import CompanyInitializationService
 
-        await self.audit.log(
-            action=AuditAction.COMPANY_CREATE,
-            user_id=current_user.id,
-            company_id=company.id,
-            resource_type="company",
-            resource_id=str(company.id),
-            description=f"Company '{company.legal_name}' created",
-            ip_address=meta.ip_address,
-            user_agent=meta.user_agent,
-        )
-        return company
+        init_service = CompanyInitializationService(self.db)
+        return await init_service.initialize_new_company(payload, current_user, meta)
 
     async def list_companies(
         self, current_user: User, *, page: int, page_size: int

@@ -51,6 +51,10 @@ class SalesInvoiceCreate(BaseModel):
     invoice_date: date
     place_of_supply: str | None = Field(default=None, max_length=100)
     place_of_supply_state_code: str | None = Field(default=None, max_length=2)
+    export_type: str | None = Field(default=None, max_length=30)
+    shipping_bill_number: str | None = Field(default=None, max_length=50)
+    shipping_bill_date: date | None = None
+    port_code: str | None = Field(default=None, max_length=20)
     discount: Annotated[Decimal, Field(ge=0)] = Decimal("0")
     items: list[SalesInvoiceItemCreate] = Field(min_length=1)
     source: DataSource = DataSource.MANUAL
@@ -63,6 +67,10 @@ class SalesInvoiceUpdate(BaseModel):
     invoice_date: date | None = None
     place_of_supply: str | None = Field(default=None, max_length=100)
     place_of_supply_state_code: str | None = Field(default=None, max_length=2)
+    export_type: str | None = Field(default=None, max_length=30)
+    shipping_bill_number: str | None = Field(default=None, max_length=50)
+    shipping_bill_date: date | None = None
+    port_code: str | None = Field(default=None, max_length=20)
     discount: Annotated[Decimal | None, Field(default=None, ge=0)] = None
     items: list[SalesInvoiceItemCreate] | None = None
 
@@ -77,6 +85,10 @@ class SalesInvoiceRead(BaseModel):
     invoice_date: date
     place_of_supply: str | None
     place_of_supply_state_code: str | None
+    export_type: str | None = None
+    shipping_bill_number: str | None = None
+    shipping_bill_date: date | None = None
+    port_code: str | None = None
     subtotal: Decimal
     discount: Decimal
     taxable_amount: Decimal

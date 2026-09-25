@@ -21,8 +21,10 @@ async def _create_return_period(client, headers, company_id, financial_year_id, 
     return response.json()["data"]
 
 
-async def _create_customer(client, headers, company_id, *, name, gstin=None, state_code=None):
-    payload = {"name": name}
+async def _create_customer(
+    client, headers, company_id, *, name, gstin=None, state_code=None, is_sez=False, is_export=False
+):
+    payload = {"name": name, "is_sez": is_sez, "is_export": is_export}
     if gstin:
         payload["gstin"] = gstin
     if state_code:
@@ -35,18 +37,40 @@ async def _create_customer(client, headers, company_id, *, name, gstin=None, sta
 
 
 async def _create_and_post_invoice(
-    client, headers, company_id, financial_year_id, customer_id, *, invoice_number, place_of_supply_state_code, items
+    client,
+    headers,
+    company_id,
+    financial_year_id,
+    customer_id,
+    *,
+    invoice_number,
+    place_of_supply_state_code,
+    items,
+    export_type=None,
+    shipping_bill_number=None,
+    shipping_bill_date=None,
+    port_code=None,
 ):
+    body = {
+        "financial_year_id": str(financial_year_id),
+        "customer_id": str(customer_id),
+        "invoice_number": invoice_number,
+        "invoice_date": "2025-04-10",
+        "place_of_supply_state_code": place_of_supply_state_code,
+        "items": items,
+    }
+    if export_type:
+        body["export_type"] = export_type
+    if shipping_bill_number:
+        body["shipping_bill_number"] = shipping_bill_number
+    if shipping_bill_date:
+        body["shipping_bill_date"] = shipping_bill_date
+    if port_code:
+        body["port_code"] = port_code
+
     create = await client.post(
         f"/api/v1/accounting/sales-invoices?company_id={company_id}",
-        json={
-            "financial_year_id": str(financial_year_id),
-            "customer_id": str(customer_id),
-            "invoice_number": invoice_number,
-            "invoice_date": "2025-04-10",
-            "place_of_supply_state_code": place_of_supply_state_code,
-            "items": items,
-        },
+        json=body,
         headers=headers,
     )
     assert create.status_code == 201, create.text
@@ -335,3 +359,128 @@ class TestGSTR1:
             headers=auth_headers(data_b["access_token"]),
         )
         assert response.status_code == 404
+
+    async def test_export_with_payment(self, client, company_a_with_admin, financial_year_a):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+
+        await _create_gst_profile(client, headers, company.id)
+        period = await _create_return_period(client, headers, company.id, financial_year_a.id)
+        customer = await _create_customer(
+            client, headers, company.id, name="Overseas Client Inc", is_export=True
+        )
+        await _create_and_post_invoice(
+            client,
+            headers,
+            company.id,
+            financial_year_a.id,
+            customer["id"],
+            invoice_number="INV-EXP-WP-1",
+            place_of_supply_state_code="96",
+            export_type="WITH_PAYMENT",
+            shipping_bill_number="SB-998877",
+            shipping_bill_date="2025-04-12",
+            port_code="INBOM1",
+            items=[{"quantity": 1, "unit_price": 50000, "igst_rate": 18}],
+        )
+
+        resp = await client.get(
+            f"/api/v1/gst/return-periods/{period['id']}/gstr1/exports?company_id={company.id}",
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        rows = resp.json()["data"]
+        assert len(rows) == 1
+        assert rows[0]["invoice_number"] == "INV-EXP-WP-1"
+        assert rows[0]["export_type"] == "WITH_PAYMENT"
+        assert rows[0]["shipping_bill_number"] == "SB-998877"
+        assert rows[0]["port_code"] == "INBOM1"
+        assert rows[0]["taxable_value"] == "50000.00"
+        assert rows[0]["igst_amount"] == "9000.00"
+
+        b2b_resp = await client.get(
+            f"/api/v1/gst/return-periods/{period['id']}/gstr1/b2b?company_id={company.id}",
+            headers=headers,
+        )
+        assert len(b2b_resp.json()["data"]) == 0
+
+    async def test_export_without_payment_under_lut(self, client, company_a_with_admin, financial_year_a):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+
+        await _create_gst_profile(client, headers, company.id)
+        period = await _create_return_period(client, headers, company.id, financial_year_a.id)
+        customer = await _create_customer(
+            client, headers, company.id, name="Foreign Buyer Ltd", is_export=True
+        )
+        await _create_and_post_invoice(
+            client,
+            headers,
+            company.id,
+            financial_year_a.id,
+            customer["id"],
+            invoice_number="INV-EXP-WOP-1",
+            place_of_supply_state_code="96",
+            export_type="WITHOUT_PAYMENT",
+            items=[{"quantity": 2, "unit_price": 25000, "igst_rate": 0}],
+        )
+
+        resp = await client.get(
+            f"/api/v1/gst/return-periods/{period['id']}/gstr1/exports?company_id={company.id}",
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        rows = resp.json()["data"]
+        assert len(rows) == 1
+        assert rows[0]["export_type"] == "WITHOUT_PAYMENT"
+        assert rows[0]["igst_amount"] == "0.00"
+
+    async def test_sez_supplies(self, client, company_a_with_admin, financial_year_a):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+
+        await _create_gst_profile(client, headers, company.id)
+        period = await _create_return_period(client, headers, company.id, financial_year_a.id)
+        customer = await _create_customer(
+            client,
+            headers,
+            company.id,
+            name="SEZ Developer TechPark",
+            gstin="27AAACS1234A1Z1",
+            state_code="27",
+            is_sez=True,
+        )
+        await _create_and_post_invoice(
+            client,
+            headers,
+            company.id,
+            financial_year_a.id,
+            customer["id"],
+            invoice_number="INV-SEZ-1",
+            place_of_supply_state_code="27",
+            export_type="SEZ_WITH_PAYMENT",
+            items=[{"quantity": 1, "unit_price": 100000, "igst_rate": 18}],
+        )
+
+        resp = await client.get(
+            f"/api/v1/gst/return-periods/{period['id']}/gstr1/exports?company_id={company.id}",
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        rows = resp.json()["data"]
+        assert len(rows) == 1
+        assert rows[0]["export_type"] == "SEZ_WITH_PAYMENT"
+        assert rows[0]["recipient_gstin"] == "27AAACS1234A1Z1"
+
+        overview = await client.get(
+            f"/api/v1/gst/return-periods/{period['id']}/gstr1?company_id={company.id}",
+            headers=headers,
+        )
+        assert overview.status_code == 200
+        data = overview.json()["data"]
+        assert data["export_count"] == 1
+        assert data["b2b_invoice_count"] == 0
+

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Building2, Plus } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -20,15 +20,23 @@ import { CompanyFormDialog } from "./CompanyFormDialog";
 import type { CompanyFormValues } from "./companySchema";
 
 export default function CompaniesListPage() {
-  const { user } = useAuth();
+  const { user, switchCompany } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const { data, isLoading } = useCompanies(page, 20);
   const createCompany = useCreateCompany();
 
+  useEffect(() => {
+    if (searchParams.get("create") === "true") {
+      setCreateOpen(true);
+    }
+  }, [searchParams]);
+
   const handleCreate = async (values: CompanyFormValues) => {
-    await createCompany.mutateAsync({
+    const created = await createCompany.mutateAsync({
       ...values,
       trade_name: values.trade_name || null,
       business_type: values.business_type || null,
@@ -40,7 +48,11 @@ export default function CompaniesListPage() {
       address: values.address || null,
       financial_year_start: values.financial_year_start || null,
     });
-    toast({ title: "Company created", variant: "success" });
+    toast({ title: "Company created successfully", variant: "success" });
+    if (created?.id) {
+      await switchCompany(created.id);
+      navigate("/dashboard");
+    }
   };
 
   return (
@@ -54,12 +66,10 @@ export default function CompaniesListPage() {
               : "Companies you're a member of"}
           </p>
         </div>
-        {user?.is_platform_super_admin && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            New Company
-          </Button>
-        )}
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          New Company
+        </Button>
       </div>
 
       <div className="rounded-lg border border-border bg-white">
@@ -112,14 +122,20 @@ export default function CompaniesListPage() {
             </TableBody>
           </Table>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-            <Building2 className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm font-medium">No companies yet</p>
-            <p className="text-xs text-muted-foreground">
-              {user?.is_platform_super_admin
-                ? "Create your first company to get started."
-                : "You haven't been added to any company yet."}
-            </p>
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Building2 className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-base font-medium">No companies yet</p>
+              <p className="text-xs text-muted-foreground max-w-sm mt-1">
+                Create your first company workspace to set up default ledgers, financial year, and compliance profiles.
+              </p>
+            </div>
+            <Button onClick={() => setCreateOpen(true)} className="mt-2">
+              <Plus className="mr-1.5 h-4 w-4" />
+              Create Company
+            </Button>
           </div>
         )}
       </div>

@@ -39,16 +39,15 @@ type FormValues = z.infer<typeof schema>;
 export default function CapitalGainsPage() {
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: financialYears } = useFinancialYears(companyId);
   const [fyId, setFyId] = useState<string>("");
   const effectiveFyId = fyId || financialYears?.items.find((fy) => fy.is_current)?.id || "";
 
   const { data, isLoading } = useCapitalGains(companyId, effectiveFyId || undefined);
-  const createMutation = useCreateCapitalGain(companyId);
-  const deleteMutation = useDeleteCapitalGain(companyId);
+  const createMutation = useCreateCapitalGain(companyId ?? "");
+  const deleteMutation = useDeleteCapitalGain(companyId ?? "");
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -56,6 +55,8 @@ export default function CapitalGainsPage() {
     resolver: zodResolver(schema),
     defaultValues: { asset_type: "EQUITY_SHARES", gain_type: "LONG_TERM" },
   });
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Landmark} />;
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);

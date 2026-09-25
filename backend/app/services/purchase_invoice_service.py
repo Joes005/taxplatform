@@ -14,6 +14,7 @@ from app.services.accounting_calculation_service import AccountingCalculationSer
 from app.services.accounting_guards import assert_date_in_financial_year, assert_period_open
 from app.services.audit_service import AuditAction, AuditService
 from app.services.auth_service import RequestMeta
+from app.services.invoice_posting_service import InvoicePostingService
 
 
 class PurchaseInvoiceService:
@@ -23,6 +24,7 @@ class PurchaseInvoiceService:
         self.vendors = VendorRepository(db)
         self.financial_years = FinancialYearRepository(db)
         self.audit = AuditService(db)
+        self.posting_service = InvoicePostingService(db)
 
     async def _validate_references(
         self, company_id: uuid.UUID, vendor_id: uuid.UUID, financial_year_id: uuid.UUID
@@ -239,6 +241,9 @@ class PurchaseInvoiceService:
         assert_date_in_financial_year(fy, invoice.invoice_date)
         await assert_period_open(self.db, company_id=company_id, on_date=invoice.invoice_date)
 
+        # Create balanced journal entry atomically
+        await self.posting_service.post_purchase_invoice(company_id, invoice, current_user, meta)
+
         invoice.status = TransactionStatus.POSTED
         await self.db.flush()
         await self.db.refresh(invoice, attribute_names=["updated_at"])
@@ -261,6 +266,11 @@ class PurchaseInvoiceService:
         invoice = await self.get(company_id, invoice_id)
         if invoice.status == TransactionStatus.CANCELLED:
             raise ConflictError("Invoice is already cancelled", code="ALREADY_CANCELLED")
+
+        if invoice.status == TransactionStatus.POSTED:
+            # Check period is open before reversing posted invoice
+            await assert_period_open(self.db, company_id=company_id, on_date=invoice.invoice_date)
+            await self.posting_service.cancel_purchase_invoice_posting(company_id, invoice, current_user, meta)
 
         invoice.status = TransactionStatus.CANCELLED
         await self.db.flush()

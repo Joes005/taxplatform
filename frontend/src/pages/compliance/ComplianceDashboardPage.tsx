@@ -18,10 +18,11 @@ const PRIORITY_VARIANT: Record<CompliancePriority, "secondary" | "warning" | "de
 
 export default function ComplianceDashboardPage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={CalendarClock} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data, isLoading } = useComplianceDashboard(companyId);
+
+  if (!activeCompany) return <EmptyCompanyState icon={CalendarClock} />;
 
   const cards: [string, number][] = data
     ? [

@@ -37,12 +37,13 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 export default function TaxPaymentsPage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={Wallet} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: financialYears } = useFinancialYears(companyId);
   const [fyId, setFyId] = useState<string>("");
   const effectiveFyId = fyId || financialYears?.items.find((fy) => fy.is_current)?.id || "";
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Wallet} />;
 
   return (
     <div className="space-y-6">

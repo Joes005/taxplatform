@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -227,8 +227,25 @@ function ReturnPeriodsCard({ companyId }: { companyId: string }) {
     control,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
-  } = useForm<PeriodFormValues>({ resolver: zodResolver(periodSchema) });
+  } = useForm<PeriodFormValues>({
+    resolver: zodResolver(periodSchema),
+    defaultValues: {
+      year: new Date().getFullYear(),
+      month: new Date().getMonth() + 1,
+    },
+  });
+
+  useEffect(() => {
+    if (financialYears?.items && financialYears.items.length > 0) {
+      const current = financialYears.items.find((f) => f.is_current) ?? financialYears.items[0];
+      if (current && !watch("financial_year_id")) {
+        setValue("financial_year_id", current.id);
+      }
+    }
+  }, [financialYears, setValue, watch]);
 
   const onSubmit = async (values: PeriodFormValues) => {
     setServerError(null);
@@ -300,8 +317,20 @@ function ReturnPeriodsCard({ companyId }: { companyId: string }) {
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {serverError && <Alert variant="destructive"><AlertDescription>{serverError}</AlertDescription></Alert>}
+            {financialYears?.items?.length === 0 && (
+              <Alert variant="warning">
+                <AlertDescription>
+                  No Financial Year found. <Link to="/accounting/financial-years" className="font-semibold underline">Create a Financial Year</Link> first.
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-1.5">
-              <Label htmlFor="period-fy">Financial year</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="period-fy">Financial year</Label>
+                <Link to="/accounting/financial-years" className="text-xs text-primary hover:underline">
+                  Manage FY
+                </Link>
+              </div>
               <Controller
                 control={control}
                 name="financial_year_id"

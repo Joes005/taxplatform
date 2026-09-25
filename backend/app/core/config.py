@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # --- CORS ---
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175"
 
     # --- Seed / Bootstrap Super Admin ---
     SEED_SUPER_ADMIN_EMAIL: str = "admin@example.com"
@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     DOCUMENT_STORAGE_PATH: str = "./storage"
     MAX_UPLOAD_SIZE_MB: int = 10
     ALLOWED_DOCUMENT_EXTENSIONS: str = "pdf,jpg,jpeg,png,xlsx,xls,csv,json"
+
+    # --- Notifications / Scheduler (Phase 7 & 8) ---
+    COMPLIANCE_SWEEP_ENABLED: bool = True
+    COMPLIANCE_SWEEP_INTERVAL_SECONDS: int = 3600
+    NOTIFICATION_PROVIDER: str = "in_app"  # "in_app", "logging", "composite"
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -59,6 +64,13 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production"
+
+    def model_post_init(self, __context) -> None:
+        if self.is_production and self.JWT_SECRET_KEY == "change-me-to-a-long-random-secret-in-production":
+            raise ValueError(
+                "CRITICAL SECURITY CONFIGURATION ERROR: JWT_SECRET_KEY cannot use the default development "
+                "placeholder in production! Please set a strong, random secret via the JWT_SECRET_KEY environment variable."
+            )
 
 
 @lru_cache

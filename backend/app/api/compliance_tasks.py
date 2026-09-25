@@ -89,6 +89,19 @@ async def list_tasks(
     return SuccessResponse(data=data)
 
 
+@router.post("/sweep-overdue", response_model=SuccessResponse[dict])
+async def sweep_overdue_tasks(
+    company_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _membership=Depends(require_permission(PermissionCode.COMPLIANCE_TASK_UPDATE.value)),
+):
+    service = ComplianceTaskService(db)
+    swept = await service.sweep_overdue(company_id, current_user)
+    await db.commit()
+    return SuccessResponse(data={"swept_count": swept}, message=f"Overdue sweep complete: {swept} tasks updated")
+
+
 @router.get("/{task_id}", response_model=SuccessResponse[ComplianceTaskRead])
 async def get_task(
     task_id: uuid.UUID,

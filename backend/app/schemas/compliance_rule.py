@@ -50,3 +50,10 @@ class ComplianceRuleRead(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class GenerateObligationRequest(BaseModel):
+    period_start: date
+    period_end: date
+    financial_year_id: uuid.UUID | None = None
+    tax_period: str | None = Field(default=None, max_length=50)

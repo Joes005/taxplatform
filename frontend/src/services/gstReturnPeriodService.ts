@@ -17,4 +17,20 @@ export const gstReturnPeriodService = {
     apiClient.get<GSTReturnPeriod>(`/gst/return-periods/${periodId}?company_id=${companyId}`),
   create: (companyId: string, payload: GSTReturnPeriodPayload) =>
     apiClient.post<GSTReturnPeriod>(`/gst/return-periods?company_id=${companyId}`, payload),
+  exportGstr1: (companyId: string, periodId: string, format: "csv" | "xlsx" = "csv") =>
+    apiClient.downloadBlob(
+      `/gst/return-periods/${periodId}/reports/gstr1?company_id=${companyId}&format=${format}`
+    ),
+  exportGstr3b: (companyId: string, periodId: string, format: "csv" | "xlsx" = "csv") =>
+    apiClient.downloadBlob(
+      `/gst/return-periods/${periodId}/reports/gstr3b?company_id=${companyId}&format=${format}`
+    ),
+  exportReconciliation: (companyId: string, periodId: string, format: "csv" | "xlsx" = "csv") =>
+    apiClient.downloadBlob(
+      `/gst/return-periods/${periodId}/reports/reconciliation?company_id=${companyId}&format=${format}`
+    ),
+  exportItc: (companyId: string, periodId: string, format: "csv" | "xlsx" = "csv") =>
+    apiClient.downloadBlob(
+      `/gst/return-periods/${periodId}/reports/itc?company_id=${companyId}&format=${format}`
+    ),
 };

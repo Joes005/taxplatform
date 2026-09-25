@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -60,11 +60,24 @@ export default function SalesInvoiceFormPage() {
     control,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { items: [{ quantity: 1, unit_price: 0 }] },
+    defaultValues: {
+      items: [{ quantity: 1, unit_price: 0 }],
+      invoice_date: new Date().toISOString().slice(0, 10),
+    },
   });
+
+  useEffect(() => {
+    if (financialYears?.items && financialYears.items.length > 0) {
+      const current = financialYears.items.find((f) => f.is_current) ?? financialYears.items[0];
+      if (current && !watch("financial_year_id")) {
+        setValue("financial_year_id", current.id);
+      }
+    }
+  }, [financialYears, setValue, watch]);
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
   const watchedItems = watch("items");
 
@@ -119,7 +132,12 @@ export default function SalesInvoiceFormPage() {
           <CardHeader><CardTitle>Details</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Financial Year</Label>
+              <div className="flex items-center justify-between">
+                <Label>Financial Year</Label>
+                <Link to="/accounting/financial-years" className="text-xs text-primary hover:underline">
+                  Manage FY
+                </Link>
+              </div>
               <Controller
                 control={control}
                 name="financial_year_id"
@@ -135,13 +153,20 @@ export default function SalesInvoiceFormPage() {
               {errors.financial_year_id && <p className="text-xs text-destructive">{errors.financial_year_id.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Customer</Label>
+              <div className="flex items-center justify-between">
+                <Label>Customer</Label>
+                <Link to="/accounting/customers" className="text-xs text-primary hover:underline">
+                  + Add Customer
+                </Link>
+              </div>
               <Controller
                 control={control}
                 name="customer_id"
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder={customers?.items?.length ? "Select customer" : "No customers available"} />
+                    </SelectTrigger>
                     <SelectContent>
                       {(customers?.items ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
@@ -149,6 +174,11 @@ export default function SalesInvoiceFormPage() {
                 )}
               />
               {errors.customer_id && <p className="text-xs text-destructive">{errors.customer_id.message}</p>}
+              {customers?.items?.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No customers found. <Link to="/accounting/customers" className="text-primary underline">Add a customer</Link> first.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="inv-number">Invoice Number</Label>

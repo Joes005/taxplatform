@@ -6,14 +6,6 @@ and a generation timestamp, so nobody mistakes a local working file for an
 actual filing (PHASE4 sections 74, 78).
 """
 
-import csv
-import io
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal
-from typing import Literal
-
-from openpyxl import Workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError, ValidationAppError
@@ -23,76 +15,13 @@ from app.repositories.gst_return_period_repository import GSTReturnPeriodReposit
 from app.services.gstr1_service import GSTR1Service
 from app.services.gstr3b_service import GSTR3BService
 from app.services.itc_service import ITCService
-
-ExportFormat = Literal["csv", "xlsx"]
-
-
-@dataclass
-class ExportSection:
-    title: str
-    headers: list[str]
-    rows: list[list]
-
-
-@dataclass
-class ExportFile:
-    content: bytes
-    filename: str
-    media_type: str
-
-
-def _stringify(value) -> str:
-    if isinstance(value, Decimal):
-        return str(value)
-    if value is None:
-        return ""
-    return str(value)
-
-
-def write_csv(*, report_type: str, gstin: str, period_label: str, sections: list[ExportSection]) -> bytes:
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow([report_type])
-    writer.writerow(["Company GSTIN", gstin])
-    writer.writerow(["Return Period", period_label])
-    writer.writerow(["Generated At", datetime.now(timezone.utc).isoformat()])
-    writer.writerow([])
-    for section in sections:
-        writer.writerow([section.title])
-        writer.writerow(section.headers)
-        for row in section.rows:
-            writer.writerow([_stringify(v) for v in row])
-        writer.writerow([])
-    return buf.getvalue().encode("utf-8-sig")
-
-
-def write_xlsx(*, report_type: str, gstin: str, period_label: str, sections: list[ExportSection]) -> bytes:
-    workbook = Workbook()
-    cover = workbook.active
-    cover.title = "Cover"
-    cover.append([report_type])
-    cover.append(["Company GSTIN", gstin])
-    cover.append(["Return Period", period_label])
-    cover.append(["Generated At", datetime.now(timezone.utc).isoformat()])
-
-    used_titles: set[str] = set()
-    for section in sections:
-        title = section.title[:31] or "Sheet"
-        suffix = 1
-        base_title = title
-        while title in used_titles:
-            suffix += 1
-            title = f"{base_title[:28]}-{suffix}"
-        used_titles.add(title)
-
-        sheet = workbook.create_sheet(title=title)
-        sheet.append(section.headers)
-        for row in section.rows:
-            sheet.append([_stringify(v) for v in row])
-
-    buf = io.BytesIO()
-    workbook.save(buf)
-    return buf.getvalue()
+from app.utils.export import (
+    ExportFile,
+    ExportFormat,
+    ExportSection,
+    write_csv,
+    write_xlsx,
+)
 
 
 class GSTExportService:
@@ -133,6 +62,7 @@ class GSTExportService:
         b2b = await self.gstr1.get_b2b(company_id, return_period_id)
         b2c_large = await self.gstr1.get_b2c_large(company_id, return_period_id)
         b2c_others = await self.gstr1.get_b2c_others(company_id, return_period_id)
+        exports = await self.gstr1.get_exports(company_id, return_period_id)
         credit_notes = await self.gstr1.get_credit_notes(company_id, return_period_id)
         debit_notes = await self.gstr1.get_debit_notes(company_id, return_period_id)
         hsn = await self.gstr1.get_hsn_summary(company_id, return_period_id)
@@ -153,6 +83,11 @@ class GSTExportService:
                 "B2C Others",
                 ["Place of Supply", "Rate", "Invoice Count", "Taxable", "CGST", "SGST", "IGST"],
                 [[r.place_of_supply_state_code, r.tax_rate, r.invoice_count, r.taxable_value, r.cgst_amount, r.sgst_amount, r.igst_amount] for r in b2c_others],
+            ),
+            ExportSection(
+                "Exports",
+                ["Export Type", "Invoice #", "Date", "Recipient", "Recipient GSTIN", "Shipping Bill #", "Shipping Bill Date", "Port Code", "Taxable", "IGST", "Cess"],
+                [[r.export_type, r.invoice_number, r.invoice_date, r.recipient_name, r.recipient_gstin, r.shipping_bill_number, r.shipping_bill_date, r.port_code, r.taxable_value, r.igst_amount, r.cess_amount] for r in exports],
             ),
             ExportSection(
                 "Credit Notes",

@@ -473,3 +473,328 @@ class TestAuditLogging:
             f"/api/v1/audit-logs?company_id={company.id}&resource_type=sales_invoice", headers=headers
         )
         assert response.json()["data"]["pagination"]["total"] >= 1
+
+
+class TestInvoiceAutoPosting:
+    async def _create_sales_draft(self, client, headers, company, fy, customer, number="INV-POST-1"):
+        response = await client.post(
+            f"/api/v1/accounting/sales-invoices?company_id={company.id}",
+            json={
+                "financial_year_id": str(fy.id),
+                "customer_id": str(customer.id),
+                "invoice_number": number,
+                "invoice_date": "2025-06-01",
+                "items": [{"quantity": 1, "unit_price": 1000, "cgst_rate": 9, "sgst_rate": 9}],
+            },
+            headers=headers,
+        )
+        assert response.status_code == 201
+        return response.json()["data"]["id"]
+
+    async def _create_purchase_draft(self, client, headers, company, fy, vendor, number="BILL-POST-1"):
+        response = await client.post(
+            f"/api/v1/accounting/purchase-invoices?company_id={company.id}",
+            json={
+                "financial_year_id": str(fy.id),
+                "vendor_id": str(vendor.id),
+                "invoice_number": number,
+                "invoice_date": "2025-06-01",
+                "items": [{"quantity": 1, "unit_price": 500, "cgst_rate": 9, "sgst_rate": 9}],
+            },
+            headers=headers,
+        )
+        assert response.status_code == 201
+        return response.json()["data"]["id"]
+
+    async def test_sales_invoice_draft_to_post(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-1")
+
+        res = await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+        assert res.status_code == 200
+        assert res.json()["data"]["status"] == "POSTED"
+
+    async def test_sales_invoice_journal_created(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-2")
+        await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+
+        journals_res = await client.get(
+            f"/api/v1/accounting/journal-entries?company_id={company.id}", headers=headers
+        )
+        assert journals_res.status_code == 200
+        items = journals_res.json()["data"]["items"]
+        matching = [j for j in items if j.get("source_reference") == f"sales_invoice:{invoice_id}"]
+        assert len(matching) == 1
+        assert matching[0]["status"] == "POSTED"
+
+    async def test_sales_invoice_debit_equals_credit(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-3")
+        await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+
+        journals_res = await client.get(
+            f"/api/v1/accounting/journal-entries?company_id={company.id}", headers=headers
+        )
+        entry_id = [j["id"] for j in journals_res.json()["data"]["items"] if j.get("source_reference") == f"sales_invoice:{invoice_id}"][0]
+
+        entry_res = await client.get(
+            f"/api/v1/accounting/journal-entries/{entry_id}?company_id={company.id}", headers=headers
+        )
+        lines = entry_res.json()["data"]["lines"]
+        total_debit = sum(float(l["debit_amount"]) for l in lines)
+        total_credit = sum(float(l["credit_amount"]) for l in lines)
+        assert total_debit == total_credit == 1180.0
+
+    async def test_sales_invoice_tax_postings(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-4")
+        await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+
+        journals_res = await client.get(
+            f"/api/v1/accounting/journal-entries?company_id={company.id}", headers=headers
+        )
+        entry_id = [j["id"] for j in journals_res.json()["data"]["items"] if j.get("source_reference") == f"sales_invoice:{invoice_id}"][0]
+        entry_res = await client.get(
+            f"/api/v1/accounting/journal-entries/{entry_id}?company_id={company.id}", headers=headers
+        )
+        lines = entry_res.json()["data"]["lines"]
+        # Grand total receivable = 1180 debit, Sales revenue = 1000 credit, CGST = 90 credit, SGST = 90 credit
+        debits = [l for l in lines if float(l["debit_amount"]) > 0]
+        credits = [l for l in lines if float(l["credit_amount"]) > 0]
+        assert len(debits) == 1
+        assert float(debits[0]["debit_amount"]) == 1180.0
+        credit_amounts = sorted([float(l["credit_amount"]) for l in credits])
+        assert credit_amounts == [90.0, 90.0, 1000.0]
+
+    async def test_purchase_invoice_post(
+        self, client, company_a_with_admin, financial_year_a, vendor_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        bill_id = await self._create_purchase_draft(client, headers, company, financial_year_a, vendor_a, "BILL-AP-1")
+        res = await client.post(
+            f"/api/v1/accounting/purchase-invoices/{bill_id}/post?company_id={company.id}", headers=headers
+        )
+        assert res.status_code == 200
+        assert res.json()["data"]["status"] == "POSTED"
+
+    async def test_purchase_invoice_journal_created(
+        self, client, company_a_with_admin, financial_year_a, vendor_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        bill_id = await self._create_purchase_draft(client, headers, company, financial_year_a, vendor_a, "BILL-AP-2")
+        await client.post(
+            f"/api/v1/accounting/purchase-invoices/{bill_id}/post?company_id={company.id}", headers=headers
+        )
+
+        journals_res = await client.get(
+            f"/api/v1/accounting/journal-entries?company_id={company.id}", headers=headers
+        )
+        items = journals_res.json()["data"]["items"]
+        matching = [j for j in items if j.get("source_reference") == f"purchase_invoice:{bill_id}"]
+        assert len(matching) == 1
+        assert matching[0]["status"] == "POSTED"
+
+    async def test_purchase_invoice_debit_equals_credit(
+        self, client, company_a_with_admin, financial_year_a, vendor_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        bill_id = await self._create_purchase_draft(client, headers, company, financial_year_a, vendor_a, "BILL-AP-3")
+        await client.post(
+            f"/api/v1/accounting/purchase-invoices/{bill_id}/post?company_id={company.id}", headers=headers
+        )
+
+        journals_res = await client.get(
+            f"/api/v1/accounting/journal-entries?company_id={company.id}", headers=headers
+        )
+        entry_id = [j["id"] for j in journals_res.json()["data"]["items"] if j.get("source_reference") == f"purchase_invoice:{bill_id}"][0]
+        entry_res = await client.get(
+            f"/api/v1/accounting/journal-entries/{entry_id}?company_id={company.id}", headers=headers
+        )
+        lines = entry_res.json()["data"]["lines"]
+        total_debit = sum(float(l["debit_amount"]) for l in lines)
+        total_credit = sum(float(l["credit_amount"]) for l in lines)
+        assert total_debit == total_credit == 590.0
+
+    async def test_duplicate_post_rejected(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-DUP")
+        res1 = await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+        assert res1.status_code == 200
+        res2 = await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+        assert res2.status_code == 409
+        assert res2.json()["error"]["code"] == "INVALID_STATUS_TRANSITION"
+
+    async def test_posted_invoice_immutable(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-IMMUT")
+        await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+        patch_res = await client.patch(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}?company_id={company.id}",
+            json={"invoice_number": "INV-MODIFIED"},
+            headers=headers,
+        )
+        assert patch_res.status_code == 409
+        assert patch_res.json()["error"]["code"] == "POSTED_TRANSACTION_IMMUTABLE"
+
+    async def test_cancel_reversal_behavior(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-REV")
+        await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+
+        # Cancel posted invoice
+        cancel_res = await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/cancel?company_id={company.id}", headers=headers
+        )
+        assert cancel_res.status_code == 200
+        assert cancel_res.json()["data"]["status"] == "CANCELLED"
+
+        # Associated journal should now be CANCELLED
+        journals_res = await client.get(
+            f"/api/v1/accounting/journal-entries?company_id={company.id}", headers=headers
+        )
+        matching = [j for j in journals_res.json()["data"]["items"] if j.get("source_reference") == f"sales_invoice:{invoice_id}"]
+        assert len(matching) == 1
+        assert matching[0]["status"] == "CANCELLED"
+
+    async def test_closed_period_rejected(
+        self, client, company_a_with_admin, financial_year_a, customer_a, db_session
+    ):
+        from datetime import date
+        from app.models.accounting_enums import PeriodStatus
+        from app.models.accounting_period import AccountingPeriod
+
+        company, admin = company_a_with_admin
+        # Create a LOCKED period covering 2025-06-01
+        period = AccountingPeriod(
+            company_id=company.id,
+            financial_year_id=financial_year_a.id,
+            name="Q1-Closed",
+            start_date=date(2025, 4, 1),
+            end_date=date(2025, 6, 30),
+            status=PeriodStatus.LOCKED,
+        )
+        db_session.add(period)
+        await db_session.flush()
+
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-LOCKED")
+
+        post_res = await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+        assert post_res.status_code == 400
+        assert post_res.json()["error"]["code"] == "PERIOD_NOT_OPEN"
+
+    async def test_cross_company_protection(
+        self, client, company_a_with_admin, company_b_with_admin, financial_year_a, customer_a
+    ):
+        company_a, admin_a = company_a_with_admin
+        company_b, admin_b = company_b_with_admin
+        data_a = await login(client, admin_a.email, "TestPass1!")
+        headers_a = auth_headers(data_a["access_token"])
+        data_b = await login(client, admin_b.email, "TestPass1!")
+        headers_b = auth_headers(data_b["access_token"])
+
+        invoice_id = await self._create_sales_draft(client, headers_a, company_a, financial_year_a, customer_a, "INV-AP-ISOL")
+
+        # Company B cannot post Company A's invoice
+        res = await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company_b.id}", headers=headers_b
+        )
+        assert res.status_code == 404
+
+    async def test_trial_balance_reflects_invoice_posting(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-TB")
+        await client.post(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+        )
+
+        tb_res = await client.get(
+            f"/api/v1/accounting/reports/trial-balance?company_id={company.id}", headers=headers
+        )
+        assert tb_res.status_code == 200
+        tb = tb_res.json()["data"]
+        assert tb["is_balanced"] is True
+        assert float(tb["total_debit"]) >= 1180.0
+        assert float(tb["total_credit"]) >= 1180.0
+
+    async def test_posting_failure_rolls_back_transaction(
+        self, client, company_a_with_admin, financial_year_a, customer_a
+    ):
+        from unittest.mock import patch
+        from app.core.exceptions import ValidationAppError
+
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        invoice_id = await self._create_sales_draft(client, headers, company, financial_year_a, customer_a, "INV-AP-FAIL")
+
+        with patch("app.services.invoice_posting_service.InvoicePostingService.post_sales_invoice", side_effect=ValidationAppError("Simulated ledger failure", code="LEDGER_FAILURE")):
+            res = await client.post(
+                f"/api/v1/accounting/sales-invoices/{invoice_id}/post?company_id={company.id}", headers=headers
+            )
+            assert res.status_code == 422
+
+        # Check invoice is still DRAFT
+        get_res = await client.get(
+            f"/api/v1/accounting/sales-invoices/{invoice_id}?company_id={company.id}", headers=headers
+        )
+        assert get_res.json()["data"]["status"] == "DRAFT"

@@ -25,6 +25,8 @@ import {
   GitMerge,
   Banknote,
   CalendarClock,
+  Bell,
+  Scale,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -53,6 +55,7 @@ const ACCOUNTING_NAV_ITEMS = [
   { to: "/accounting/dashboard", label: "Dashboard", icon: Gauge },
   { to: "/accounting/financial-years", label: "Financial Years", icon: CalendarRange },
   { to: "/accounting/ledgers", label: "Ledgers", icon: Layers },
+  { to: "/accounting/opening-balances", label: "Opening Balances", icon: Scale },
   { to: "/accounting/customers", label: "Customers", icon: UsersRound },
   { to: "/accounting/vendors", label: "Vendors", icon: Truck },
   { to: "/accounting/products", label: "Products", icon: Package },
@@ -101,6 +104,8 @@ const COMPLIANCE_NAV_ITEMS = [
   { to: "/compliance", label: "Dashboard", icon: CalendarClock },
   { to: "/compliance/calendar", label: "Calendar", icon: CalendarClock },
   { to: "/compliance/tasks", label: "Tasks", icon: CalendarClock },
+  { to: "/compliance/obligations", label: "Obligations & Rules", icon: ShieldCheck },
+  { to: "/notifications", label: "Notifications", icon: Bell },
 ];
 
 export function AppLayout() {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -182,7 +183,12 @@ export default function BankAccountsPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ba-ledger">Linked ledger (optional, enables book-balance comparison)</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ba-ledger">Linked ledger (optional)</Label>
+                <Link to="/accounting/ledgers" className="text-xs text-primary hover:underline">
+                  Manage Ledgers
+                </Link>
+              </div>
               <Controller
                 control={control}
                 name="ledger_id"
@@ -195,6 +201,9 @@ export default function BankAccountsPage() {
                   </Select>
                 )}
               />
+              <p className="text-xs text-muted-foreground">
+                Tip: Link to a Bank ledger (e.g. &quot;Bank Account&quot;) to enable automated book balance comparison.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

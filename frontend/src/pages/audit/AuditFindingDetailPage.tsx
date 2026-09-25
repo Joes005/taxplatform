@@ -56,8 +56,7 @@ export default function AuditFindingDetailPage() {
   const { findingId } = useParams<{ findingId: string }>();
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <ClipboardCheck className="h-6 w-6" />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: finding, isLoading } = useAuditFinding(companyId, findingId);
   const { data: comments } = useAuditFindingComments(companyId, findingId);
@@ -66,16 +65,16 @@ export default function AuditFindingDetailPage() {
   const { data: companyUsers } = useCompanyUsers(companyId);
   const { data: documents } = useDocuments(companyId ? { companyId, pageSize: 100 } : null);
 
-  const assign = useAssignAuditFinding(companyId, findingId ?? "");
-  const resolve = useResolveAuditFinding(companyId, findingId ?? "");
-  const close = useCloseAuditFinding(companyId, findingId ?? "");
-  const reopen = useReopenAuditFinding(companyId, findingId ?? "");
-  const reject = useRejectAuditFinding(companyId, findingId ?? "");
-  const addComment = useAddAuditFindingComment(companyId, findingId ?? "");
-  const addEvidence = useAddAuditFindingEvidence(companyId, findingId ?? "");
-  const removeEvidence = useRemoveAuditFindingEvidence(companyId, findingId ?? "");
-  const submitResponse = useSubmitAuditFindingResponse(companyId, findingId ?? "");
-  const reviewResponse = useReviewAuditFindingResponse(companyId, findingId ?? "");
+  const assign = useAssignAuditFinding(companyId ?? "", findingId ?? "");
+  const resolve = useResolveAuditFinding(companyId ?? "", findingId ?? "");
+  const close = useCloseAuditFinding(companyId ?? "", findingId ?? "");
+  const reopen = useReopenAuditFinding(companyId ?? "", findingId ?? "");
+  const reject = useRejectAuditFinding(companyId ?? "", findingId ?? "");
+  const addComment = useAddAuditFindingComment(companyId ?? "", findingId ?? "");
+  const addEvidence = useAddAuditFindingEvidence(companyId ?? "", findingId ?? "");
+  const removeEvidence = useRemoveAuditFindingEvidence(companyId ?? "", findingId ?? "");
+  const submitResponse = useSubmitAuditFindingResponse(companyId ?? "", findingId ?? "");
+  const reviewResponse = useReviewAuditFindingResponse(companyId ?? "", findingId ?? "");
 
   const [commentText, setCommentText] = useState("");
   const [responseText, setResponseText] = useState("");
@@ -84,6 +83,7 @@ export default function AuditFindingDetailPage() {
   const [assignTo, setAssignTo] = useState("");
   const [evidenceDoc, setEvidenceDoc] = useState("");
 
+  if (!activeCompany || !companyId) return <ClipboardCheck className="h-6 w-6" />;
   if (isLoading || !finding || !findingId) return <Skeleton className="h-64 w-full" />;
 
   const run = async (action: () => Promise<unknown>, message: string) => {

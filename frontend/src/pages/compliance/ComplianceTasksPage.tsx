@@ -66,8 +66,7 @@ type FormValues = z.infer<typeof schema>;
 export default function ComplianceTasksPage() {
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <EmptyCompanyState icon={CalendarClock} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -79,7 +78,7 @@ export default function ComplianceTasksPage() {
     search: search || undefined,
   });
   const { data: companyUsers } = useCompanyUsers(companyId);
-  const createMutation = useCreateComplianceTask(companyId);
+  const createMutation = useCreateComplianceTask(companyId ?? "");
   const [open, setOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -87,6 +86,8 @@ export default function ComplianceTasksPage() {
     resolver: zodResolver(schema),
     defaultValues: { category: "GENERAL", module: "GENERAL", priority: "MEDIUM" },
   });
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={CalendarClock} />;
 
   const onSubmit = async (values: FormValues) => {
     try {

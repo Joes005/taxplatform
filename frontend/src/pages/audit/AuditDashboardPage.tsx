@@ -25,10 +25,11 @@ const STATUS_VARIANT: Record<AuditEngagementStatus, "secondary" | "warning" | "s
 
 export default function AuditDashboardPage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={ClipboardCheck} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data, isLoading } = useAuditDashboard(companyId);
+
+  if (!activeCompany) return <EmptyCompanyState icon={ClipboardCheck} />;
 
   const engagementCards: [string, number][] = data
     ? [

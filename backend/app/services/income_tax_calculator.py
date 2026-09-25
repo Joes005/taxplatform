@@ -45,23 +45,93 @@ def compute_rebate(taxable_income: Decimal, tax_before_rebate: Decimal, rebate_r
     return ZERO
 
 
+def compute_marginal_relief(
+    taxable_income: Decimal,
+    tax_after_rebate: Decimal,
+    flat_surcharge: Decimal,
+    threshold: Decimal,
+    prior_threshold_rate: Decimal,
+    slabs: list[IncomeTaxSlab],
+    rebate_rules: list[IncomeTaxRebateRule] | None = None,
+) -> Decimal:
+    """Calculates statutory marginal relief on surcharge under Indian Income Tax law.
+
+    The total tax + surcharge payable on taxable income exceeding a threshold
+    shall not exceed:
+    (Total tax + surcharge payable on income equal to threshold) + (Taxable Income - Threshold).
+
+    Any excess over this cap is granted as marginal relief and deducted from surcharge.
+    """
+    if taxable_income <= threshold or flat_surcharge <= ZERO or not slabs:
+        return ZERO
+
+    excess_income = taxable_income - threshold
+
+    # 1. Tax at the threshold income
+    tax_at_threshold = compute_slab_tax(threshold, slabs)
+    rebate_at_threshold = compute_rebate(threshold, tax_at_threshold, rebate_rules or [])
+    net_tax_at_threshold = tax_at_threshold - rebate_at_threshold
+
+    # 2. Surcharge at the threshold income (if the threshold itself was subject to an earlier surcharge bracket)
+    surcharge_at_threshold = ZERO
+    if prior_threshold_rate > ZERO:
+        surcharge_at_threshold = round_money(net_tax_at_threshold * prior_threshold_rate / Decimal("100"))
+
+    total_tax_at_threshold = net_tax_at_threshold + surcharge_at_threshold
+
+    # 3. Maximum permissible tax + surcharge under marginal relief
+    max_permissible_tax = total_tax_at_threshold + excess_income
+
+    # 4. Tax + flat surcharge without relief
+    total_tax_without_relief = tax_after_rebate + flat_surcharge
+
+    # 5. Marginal relief is the excess
+    if total_tax_without_relief > max_permissible_tax:
+        relief = round_money(total_tax_without_relief - max_permissible_tax)
+        return min(flat_surcharge, max(ZERO, relief))
+    return ZERO
+
+
 def compute_surcharge(
-    taxable_income: Decimal, tax_after_rebate: Decimal, surcharge_rules: list[IncomeTaxSurchargeRule]
+    taxable_income: Decimal,
+    tax_after_rebate: Decimal,
+    surcharge_rules: list[IncomeTaxSurchargeRule],
+    slabs: list[IncomeTaxSlab] | None = None,
+    rebate_rules: list[IncomeTaxRebateRule] | None = None,
 ) -> tuple[Decimal, bool]:
-    """Flat-rate surcharge once a threshold is crossed — no marginal
-    relief (see `IncomeTaxSurchargeRule`'s own docstring). Returns
-    `(surcharge_amount, threshold_crossed)` so the caller can raise a
-    `WARNING` validation item whenever a surcharge actually applies,
-    prompting a human to check marginal relief manually."""
-    applicable_rate = ZERO
-    crossed = False
-    for rule in sorted(surcharge_rules, key=lambda r: r.income_threshold):
+    """Calculates surcharge once an income threshold is crossed, applying statutory
+    marginal relief when slabs are provided.
+
+    Returns (surcharge_amount, threshold_crossed).
+    """
+    applicable_rule: IncomeTaxSurchargeRule | None = None
+    prior_rate = ZERO
+    sorted_rules = sorted(surcharge_rules, key=lambda r: r.income_threshold)
+
+    for rule in sorted_rules:
         if taxable_income > rule.income_threshold:
-            applicable_rate = rule.rate
-            crossed = True
-    if not crossed:
+            prior_rate = applicable_rule.rate if applicable_rule else ZERO
+            applicable_rule = rule
+
+    if applicable_rule is None:
         return ZERO, False
-    return round_money(tax_after_rebate * applicable_rate / Decimal("100")), True
+
+    flat_surcharge = round_money(tax_after_rebate * applicable_rule.rate / Decimal("100"))
+
+    if slabs:
+        relief = compute_marginal_relief(
+            taxable_income=taxable_income,
+            tax_after_rebate=tax_after_rebate,
+            flat_surcharge=flat_surcharge,
+            threshold=applicable_rule.income_threshold,
+            prior_threshold_rate=prior_rate,
+            slabs=slabs,
+            rebate_rules=rebate_rules,
+        )
+        final_surcharge = max(ZERO, round_money(flat_surcharge - relief))
+        return final_surcharge, True
+
+    return flat_surcharge, True
 
 
 def compute_cess(base_tax: Decimal, cess_rate: Decimal) -> Decimal:
@@ -71,13 +141,20 @@ def compute_cess(base_tax: Decimal, cess_rate: Decimal) -> Decimal:
 def compute_gross_tax_liability(
     taxable_income: Decimal, rule_set: IncomeTaxRuleSet
 ) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal, bool]:
-    """Runs the full slab -> rebate -> surcharge -> cess sequence and
-    returns `(tax_before_rebate, rebate, surcharge, cess,
+    """Runs the full slab -> rebate -> surcharge (with marginal relief) -> cess
+    sequence and returns `(tax_before_rebate, rebate, surcharge, cess,
     gross_tax_liability, surcharge_applied)`."""
     tax_before_rebate = compute_slab_tax(taxable_income, rule_set.slabs)
     rebate = compute_rebate(taxable_income, tax_before_rebate, rule_set.rebate_rules)
     tax_after_rebate = tax_before_rebate - rebate
-    surcharge, surcharge_applied = compute_surcharge(taxable_income, tax_after_rebate, rule_set.surcharge_rules)
+    surcharge, surcharge_applied = compute_surcharge(
+        taxable_income,
+        tax_after_rebate,
+        rule_set.surcharge_rules,
+        slabs=rule_set.slabs,
+        rebate_rules=rule_set.rebate_rules,
+    )
     cess = compute_cess(tax_after_rebate + surcharge, rule_set.cess_rate)
     gross_tax_liability = round_money(tax_after_rebate + surcharge + cess)
     return tax_before_rebate, rebate, surcharge, cess, gross_tax_liability, surcharge_applied
+

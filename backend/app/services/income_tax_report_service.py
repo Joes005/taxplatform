@@ -11,10 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.income_tax_capital_gain_repository import IncomeTaxCapitalGainRepository
 from app.repositories.income_tax_deduction_repository import IncomeTaxDeductionRepository
-from app.services.gst_export_service import ExportFile, ExportSection, write_csv, write_xlsx
 from app.services.income_tax_computation_service import IncomeTaxComputationService
-
-ExportFormat = Literal["csv", "xlsx"]
+from app.utils.export import ExportFile, ExportFormat, ExportSection, write_csv, write_xlsx
 
 
 class IncomeTaxReportService:

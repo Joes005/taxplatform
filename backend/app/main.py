@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -85,10 +87,30 @@ from app.core.exceptions import AppException
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("app")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    sweep_task = None
+    if settings.COMPLIANCE_SWEEP_ENABLED and settings.COMPLIANCE_SWEEP_INTERVAL_SECONDS > 0:
+        from app.services.compliance_scheduler import periodic_compliance_sweep
+
+        sweep_task = asyncio.create_task(
+            periodic_compliance_sweep(settings.COMPLIANCE_SWEEP_INTERVAL_SECONDS)
+        )
+    yield
+    if sweep_task is not None:
+        sweep_task.cancel()
+        try:
+            await sweep_task
+        except asyncio.CancelledError:
+            pass
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="0.1.0",
     description="Phase 1: Foundation, Authentication, RBAC & Multi-Tenant Architecture",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

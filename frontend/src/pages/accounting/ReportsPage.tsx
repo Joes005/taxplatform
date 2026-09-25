@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Download } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/useToast";
 import {
   useCustomerOutstanding,
   usePurchaseSummary,
@@ -9,6 +10,7 @@ import {
   useTrialBalance,
   useVendorOutstanding,
 } from "@/hooks/useReports";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +18,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, triggerBlobDownload } from "@/lib/utils";
+import { reportService } from "@/services/reportService";
 import { EmptyCompanyState, EmptyTableState } from "./LedgersPage";
 import type { PartyOutstanding, SalesPurchaseSummary } from "@/types/accounting";
 
@@ -76,13 +79,56 @@ function DateRangeFilters({
 function SummaryTab({ companyId, kind }: { companyId: string; kind: "sales" | "purchases" }) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const { toast } = useToast();
   const salesQuery = useSalesSummary(kind === "sales" ? companyId : undefined, dateFrom || undefined, dateTo || undefined);
   const purchaseQuery = usePurchaseSummary(kind === "purchases" ? companyId : undefined, dateFrom || undefined, dateTo || undefined);
   const { data, isLoading } = kind === "sales" ? salesQuery : purchaseQuery;
 
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setDownloading(true);
+    try {
+      const res =
+        kind === "sales"
+          ? await reportService.exportSalesRegister(companyId, format, dateFrom || undefined, dateTo || undefined)
+          : await reportService.exportPurchaseRegister(companyId, format, dateFrom || undefined, dateTo || undefined);
+      triggerBlobDownload(res.blob, res.filename ?? `${kind}-register.${format}`);
+      toast({
+        title: `${kind === "sales" ? "Sales" : "Purchase"} register exported (${format.toUpperCase()})`,
+        variant: "success",
+      });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <DateRangeFilters dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <DateRangeFilters dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={downloading || isLoading || !data || data.invoice_count === 0}
+            onClick={() => handleExport("csv")}
+            className="gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={downloading || isLoading || !data || data.invoice_count === 0}
+            onClick={() => handleExport("xlsx")}
+            className="gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" /> Export Excel
+          </Button>
+        </div>
+      </div>
       {isLoading ? (
         <Skeleton className="h-40 w-full" />
       ) : data ? (
@@ -161,20 +207,57 @@ function OutstandingTab({ companyId, kind }: { companyId: string; kind: "custome
 
 function TrialBalanceTab({ companyId }: { companyId: string }) {
   const [asOf, setAsOf] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const { toast } = useToast();
   const { data, isLoading } = useTrialBalance(companyId, asOf || undefined);
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setDownloading(true);
+    try {
+      const res = await reportService.exportTrialBalance(companyId, format, asOf || undefined);
+      triggerBlobDownload(res.blob, res.filename ?? `trial-balance.${format}`);
+      toast({ title: `Trial balance exported (${format.toUpperCase()})`, variant: "success" });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end justify-between">
-        <div className="space-y-1.5">
-          <Label>As of</Label>
-          <Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="flex items-end gap-3">
+          <div className="space-y-1.5">
+            <Label>As of</Label>
+            <Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+          </div>
+          {data && (
+            <Badge variant={data.is_balanced ? "success" : "destructive"}>
+              {data.is_balanced ? "Balanced" : "Not balanced"}
+            </Badge>
+          )}
         </div>
-        {data && (
-          <Badge variant={data.is_balanced ? "success" : "destructive"}>
-            {data.is_balanced ? "Balanced" : "Not balanced"}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={downloading || isLoading || !data || data.lines.length === 0}
+            onClick={() => handleExport("csv")}
+            className="gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={downloading || isLoading || !data || data.lines.length === 0}
+            onClick={() => handleExport("xlsx")}
+            className="gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" /> Export Excel
+          </Button>
+        </div>
       </div>
       <Card>
         <CardContent className="p-0">

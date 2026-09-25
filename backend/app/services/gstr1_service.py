@@ -32,6 +32,7 @@ from app.schemas.gstr1 import (
     GSTR1B2CLargeRow,
     GSTR1B2COthersRow,
     GSTR1DocumentSummaryRow,
+    GSTR1ExportRow,
     GSTR1HSNRow,
     GSTR1NoteRow,
     GSTR1Overview,
@@ -98,13 +99,26 @@ class GSTR1Service:
 
         classified: list[_ClassifiedInvoice] = []
         for invoice in invoices:
+            is_export = bool(
+                (invoice.customer and invoice.customer.is_export)
+                or (invoice.export_type in ("WITH_PAYMENT", "WITHOUT_PAYMENT", "DEEMED_EXPORT"))
+            )
+            is_sez = bool(
+                (invoice.customer and invoice.customer.is_sez)
+                or (invoice.export_type in ("SEZ_WITH_PAYMENT", "SEZ_WITHOUT_PAYMENT"))
+            )
             result = GSTTransactionClassificationService.classify_sales_transaction(
                 customer_gstin=invoice.customer.gstin if invoice.customer else None,
                 customer_state_code=invoice.customer.state_code if invoice.customer else None,
                 place_of_supply_state_code=invoice.place_of_supply_state_code,
+                is_export=is_export,
+                is_sez=is_sez,
+                export_type=invoice.export_type,
             )
             supply_type = None
-            if invoice.place_of_supply_state_code:
+            if result.category in (GSTTransactionCategory.EXPORT, GSTTransactionCategory.SEZ):
+                supply_type = SupplyType.INTER_STATE
+            elif invoice.place_of_supply_state_code:
                 supply_type = GSTPlaceOfSupplyService.determine_supply_type(
                     profile.state_code, invoice.place_of_supply_state_code
                 )
@@ -215,9 +229,41 @@ class GSTR1Service:
             for (state_code, rate), bucket in sorted(groups.items(), key=lambda kv: (kv[0][0] or "", kv[0][1]))
         ]
 
-    async def get_exports(self, company_id: uuid.UUID, return_period_id: uuid.UUID) -> list:
-        await self._get_period(company_id, return_period_id)
-        return []
+    async def get_exports(self, company_id: uuid.UUID, return_period_id: uuid.UUID) -> list[GSTR1ExportRow]:
+        data = await self._prepare(company_id, return_period_id)
+        export_invoices = [
+            c.invoice
+            for c in data.classified
+            if c.category in (GSTTransactionCategory.EXPORT, GSTTransactionCategory.SEZ)
+        ]
+        rows = []
+        for inv in export_invoices:
+            exp_type = inv.export_type
+            if not exp_type:
+                if inv.customer and inv.customer.is_sez:
+                    exp_type = "SEZ_WITH_PAYMENT" if inv.igst_amount > 0 else "SEZ_WITHOUT_PAYMENT"
+                else:
+                    exp_type = "WITH_PAYMENT" if inv.igst_amount > 0 else "WITHOUT_PAYMENT"
+
+            rows.append(
+                GSTR1ExportRow(
+                    sales_invoice_id=inv.id,
+                    export_type=exp_type,
+                    recipient_name=inv.customer.name if inv.customer else None,
+                    recipient_gstin=inv.customer.gstin if inv.customer else None,
+                    invoice_number=inv.invoice_number,
+                    invoice_date=inv.invoice_date,
+                    invoice_value=inv.grand_total,
+                    port_code=inv.port_code,
+                    shipping_bill_number=inv.shipping_bill_number,
+                    shipping_bill_date=inv.shipping_bill_date,
+                    taxable_value=inv.taxable_amount,
+                    igst_amount=inv.igst_amount,
+                    cess_amount=inv.cess_amount,
+                )
+            )
+        return sorted(rows, key=lambda r: (r.invoice_date, r.invoice_number))
+
 
     async def _get_note_rows(
         self,
@@ -272,7 +318,13 @@ class GSTR1Service:
         counted_invoices = [
             c.invoice
             for c in data.classified
-            if c.category in (GSTTransactionCategory.B2B, GSTTransactionCategory.B2C)
+            if c.category
+            in (
+                GSTTransactionCategory.B2B,
+                GSTTransactionCategory.B2C,
+                GSTTransactionCategory.EXPORT,
+                GSTTransactionCategory.SEZ,
+            )
         ]
         product_ids = {
             item.product_service_id
@@ -443,20 +495,26 @@ class GSTR1Service:
             for c in data.classified
             if c.category == GSTTransactionCategory.B2C and not self._is_b2c_large(c)
         ]
+        exports = [
+            c
+            for c in data.classified
+            if c.category in (GSTTransactionCategory.EXPORT, GSTTransactionCategory.SEZ)
+        ]
         findings = await self.validate(company_id, return_period_id)
 
-        taxable_value = sum((c.invoice.taxable_amount for c in b2b + b2c_large + b2c_others), Decimal("0"))
-        cgst = sum((c.invoice.cgst_amount for c in b2b + b2c_large + b2c_others), Decimal("0"))
-        sgst = sum((c.invoice.sgst_amount for c in b2b + b2c_large + b2c_others), Decimal("0"))
-        igst = sum((c.invoice.igst_amount for c in b2b + b2c_large + b2c_others), Decimal("0"))
-        cess = sum((c.invoice.cess_amount for c in b2b + b2c_large + b2c_others), Decimal("0"))
+        all_sales = b2b + b2c_large + b2c_others + exports
+        taxable_value = sum((c.invoice.taxable_amount for c in all_sales), Decimal("0"))
+        cgst = sum((c.invoice.cgst_amount for c in all_sales), Decimal("0"))
+        sgst = sum((c.invoice.sgst_amount for c in all_sales), Decimal("0"))
+        igst = sum((c.invoice.igst_amount for c in all_sales), Decimal("0"))
+        cess = sum((c.invoice.cess_amount for c in all_sales), Decimal("0"))
 
         return GSTR1Overview(
             return_period_id=return_period_id,
             b2b_invoice_count=len(b2b),
             b2c_large_invoice_count=len(b2c_large),
             b2c_others_invoice_count=len(b2c_others),
-            export_count=0,
+            export_count=len(exports),
             credit_note_count=len(data.credit_notes),
             debit_note_count=len(data.debit_notes),
             taxable_value=taxable_value,

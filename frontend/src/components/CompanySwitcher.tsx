@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, Check, ChevronsUpDown } from "lucide-react";
+import { Building2, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -23,10 +23,15 @@ export function CompanySwitcher() {
 
   if (companies.length === 0 && !user?.is_platform_super_admin) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground">
-        <Building2 className="h-4 w-4" />
-        No company yet
-      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="border-dashed text-primary hover:text-primary hover:bg-primary/5"
+        onClick={() => navigate("/companies?create=true")}
+      >
+        <Plus className="mr-1.5 h-4 w-4" />
+        Create Company
+      </Button>
     );
   }
 
@@ -65,7 +70,7 @@ export function CompanySwitcher() {
           <DropdownMenuItem
             key={c.company_id}
             onClick={() => handleSwitch(c.company_id)}
-            className="flex items-center justify-between"
+            className="flex items-center justify-between cursor-pointer"
           >
             <div className="flex flex-col">
               <span className="font-medium">{c.company_name}</span>
@@ -81,6 +86,21 @@ export function CompanySwitcher() {
             No company memberships yet.
           </div>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => navigate("/companies?create=true")}
+          className="cursor-pointer font-medium text-primary"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create New Company
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => navigate("/companies")}
+          className="cursor-pointer text-muted-foreground hover:text-foreground"
+        >
+          <Building2 className="mr-2 h-4 w-4" />
+          Manage Companies
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -33,3 +33,5 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     state_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
     pincode: Mapped[str | None] = mapped_column(String(10), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_sez: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    is_export: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")

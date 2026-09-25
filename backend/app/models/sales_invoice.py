@@ -51,6 +51,11 @@ class SalesInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     place_of_supply: Mapped[str | None] = mapped_column(String(100), nullable=True)
     place_of_supply_state_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
 
+    export_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    shipping_bill_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    shipping_bill_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    port_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     subtotal: Mapped[Decimal] = mapped_column(MONEY, default=0, nullable=False)
     discount: Mapped[Decimal] = mapped_column(MONEY, default=0, nullable=False)
     taxable_amount: Mapped[Decimal] = mapped_column(MONEY, default=0, nullable=False)

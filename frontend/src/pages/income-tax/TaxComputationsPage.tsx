@@ -41,12 +41,11 @@ type FormValues = z.infer<typeof schema>;
 export default function TaxComputationsPage() {
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <EmptyCompanyState icon={Receipt} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data, isLoading } = useTaxComputations(companyId);
   const { data: financialYears } = useFinancialYears(companyId);
-  const createMutation = useCreateTaxComputation(companyId);
+  const createMutation = useCreateTaxComputation(companyId ?? "");
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -54,6 +53,8 @@ export default function TaxComputationsPage() {
     resolver: zodResolver(schema),
     defaultValues: { tax_regime: "NEW_REGIME" },
   });
+
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Receipt} />;
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);

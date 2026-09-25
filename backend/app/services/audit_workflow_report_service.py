@@ -29,9 +29,7 @@ from app.schemas.audit_report import (
     AuditReviewQueueItem,
     AuditWorkflowDashboard,
 )
-from app.services.gst_export_service import ExportFile, ExportSection, write_csv, write_xlsx
-
-ExportFormat = Literal["csv", "xlsx"]
+from app.utils.export import ExportFile, ExportFormat, ExportSection, write_csv, write_xlsx
 
 _OPEN_FINDING_STATUSES = {
     AuditFindingStatus.OPEN,

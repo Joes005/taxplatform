@@ -125,6 +125,44 @@ class TestComplianceRule:
         assert response.status_code == 200
         assert response.json()["data"]["is_active"] is False
 
+    async def test_generate_obligation_from_rule_api(self, client, company_a_with_admin, financial_year_a):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+        rule = await _create_rule(client, headers, company.id, code="GSTR1_API_TEST", company_specific=True)
+
+        resp = await client.post(
+            f"/api/v1/compliance/rules/{rule['id']}/generate-obligations?company_id={company.id}",
+            json={
+                "financial_year_id": str(financial_year_a.id),
+                "tax_period": "2025-05",
+                "period_start": "2025-05-01",
+                "period_end": "2025-05-31",
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        data = resp.json()["data"]
+        assert data["due_date"] == "2025-06-20"
+        assert data["code"] == "GSTR1_API_TEST"
+        assert data["rule_version"] == 1
+        assert data["financial_year_id"] == str(financial_year_a.id)
+        obligation_id = data["id"]
+
+        # Test idempotency via the HTTP API
+        resp_idem = await client.post(
+            f"/api/v1/compliance/rules/{rule['id']}/generate-obligations?company_id={company.id}",
+            json={
+                "financial_year_id": str(financial_year_a.id),
+                "tax_period": "2025-05",
+                "period_start": "2025-05-01",
+                "period_end": "2025-05-31",
+            },
+            headers=headers,
+        )
+        assert resp_idem.status_code == 201
+        assert resp_idem.json()["data"]["id"] == obligation_id
+
 
 class TestComplianceObligation:
     async def test_manual_obligation_duplicate_natural_key_rejected(
@@ -645,3 +683,128 @@ class TestComplianceReport:
         )
         assert export.status_code == 200
         assert export.headers["content-type"].startswith("text/csv")
+
+
+class TestComplianceOverdueSweep:
+    async def test_overdue_sweep_detection_and_idempotency(self, client, db_session, company_a_with_admin):
+        company, admin = company_a_with_admin
+        data = await login(client, admin.email, "TestPass1!")
+        headers = auth_headers(data["access_token"])
+
+        # Create past-due task
+        past_date = (date.today() - timedelta(days=2)).isoformat()
+        t1 = await client.post(
+            f"/api/v1/compliance/tasks?company_id={company.id}",
+            json={
+                "title": "Overdue Task 1",
+                "category": "GENERAL",
+                "module": "GENERAL",
+                "due_date": past_date,
+                "assigned_to": str(admin.id),
+            },
+            headers=headers,
+        )
+        assert t1.status_code == 201
+        t1_id = t1.json()["data"]["id"]
+
+        # Create future task
+        future_date = (date.today() + timedelta(days=5)).isoformat()
+        t2 = await client.post(
+            f"/api/v1/compliance/tasks?company_id={company.id}",
+            json={
+                "title": "Future Task 2",
+                "category": "GENERAL",
+                "module": "GENERAL",
+                "due_date": future_date,
+                "assigned_to": str(admin.id),
+            },
+            headers=headers,
+        )
+        assert t2.status_code == 201
+        t2_id = t2.json()["data"]["id"]
+
+        # Run sweep
+        sweep1 = await client.post(
+            f"/api/v1/compliance/tasks/sweep-overdue?company_id={company.id}",
+            headers=headers,
+        )
+        assert sweep1.status_code == 200, sweep1.text
+        assert sweep1.json()["data"]["swept_count"] == 1
+
+        # Verify task 1 is now OVERDUE, task 2 is still PENDING
+        get1 = await client.get(f"/api/v1/compliance/tasks/{t1_id}?company_id={company.id}", headers=headers)
+        assert get1.json()["data"]["status"] == "OVERDUE"
+        assert get1.json()["data"]["is_overdue"] is True
+
+        get2 = await client.get(f"/api/v1/compliance/tasks/{t2_id}?company_id={company.id}", headers=headers)
+        assert get2.json()["data"]["status"] == "PENDING"
+        assert get2.json()["data"]["is_overdue"] is False
+
+        # Run repeated sweep (Idempotency)
+        sweep2 = await client.post(
+            f"/api/v1/compliance/tasks/sweep-overdue?company_id={company.id}",
+            headers=headers,
+        )
+        assert sweep2.status_code == 200
+        assert sweep2.json()["data"]["swept_count"] == 0
+
+        # Verify notifications deduplication: admin only received 1 notification
+        notifs = await client.get(f"/api/v1/notifications?company_id={company.id}", headers=headers)
+        overdue_notifs = [n for n in notifs.json()["data"]["items"] if n["type"] == "TASK_OVERDUE"]
+        assert len(overdue_notifs) == 1
+        assert overdue_notifs[0]["entity_id"] == t1_id
+
+    async def test_overdue_sweep_company_isolation(
+        self, client, db_session, company_a_with_admin, company_b_with_admin
+    ):
+        company_a, admin_a = company_a_with_admin
+        company_b, admin_b = company_b_with_admin
+        data_a = await login(client, admin_a.email, "TestPass1!")
+        headers_a = auth_headers(data_a["access_token"])
+        data_b = await login(client, admin_b.email, "TestPass1!")
+        headers_b = auth_headers(data_b["access_token"])
+
+        past_date = (date.today() - timedelta(days=3)).isoformat()
+
+        # Task in company A
+        t_a = await client.post(
+            f"/api/v1/compliance/tasks?company_id={company_a.id}",
+            json={
+                "title": "Comp A Task",
+                "category": "GST",
+                "module": "GST",
+                "due_date": past_date,
+            },
+            headers=headers_a,
+        )
+        t_a_id = t_a.json()["data"]["id"]
+
+        # Task in company B
+        t_b = await client.post(
+            f"/api/v1/compliance/tasks?company_id={company_b.id}",
+            json={
+                "title": "Comp B Task",
+                "category": "TDS",
+                "module": "TDS",
+                "due_date": past_date,
+            },
+            headers=headers_b,
+        )
+        t_b_id = t_b.json()["data"]["id"]
+
+        # Sweep only company A
+        sweep_a = await client.post(
+            f"/api/v1/compliance/tasks/sweep-overdue?company_id={company_a.id}",
+            headers=headers_a,
+        )
+        assert sweep_a.status_code == 200
+        assert sweep_a.json()["data"]["swept_count"] == 1
+
+        # Company A's task is OVERDUE
+        get_a = await client.get(f"/api/v1/compliance/tasks/{t_a_id}?company_id={company_a.id}", headers=headers_a)
+        assert get_a.json()["data"]["status"] == "OVERDUE"
+
+        # Company B's task is still PENDING because Company B was not swept
+        get_b = await client.get(f"/api/v1/compliance/tasks/{t_b_id}?company_id={company_b.id}", headers=headers_b)
+        assert get_b.json()["data"]["status"] == "PENDING"
+

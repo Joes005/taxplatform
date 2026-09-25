@@ -3,7 +3,8 @@ import * as React from "react";
 import { tokenStorage } from "@/lib/token-storage";
 import { sessionStorageHelper } from "@/lib/session-storage";
 import { authService } from "@/services/authService";
-import type { ActiveCompanyContext, MembershipCompanySummary, User } from "@/types/api";
+import { companyService } from "@/services/companyService";
+import type { ActiveCompanyContext, MembershipCompanySummary, MembershipStatus, User } from "@/types/api";
 
 interface AuthContextValue {
   user: User | null;
@@ -14,6 +15,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
+  refreshCompanies: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
 }
 
@@ -77,10 +79,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (companyId: string) => {
       const context = await authService.selectCompany(companyId);
       setActiveCompany(context);
-      sessionStorageHelper.save({ companies, activeCompany: context });
+      setCompanies((prev) => {
+        const exists = prev.some((c) => c.company_id === companyId);
+        const updated = exists
+          ? prev
+          : [
+              ...prev,
+              {
+                company_id: context.company_id,
+                company_name: context.company_name,
+                role_code: context.role_code,
+                role_name: context.role_name,
+                status: "ACTIVE" as MembershipStatus,
+              },
+            ];
+        sessionStorageHelper.save({ companies: updated, activeCompany: context });
+        return updated;
+      });
     },
-    [companies]
+    []
   );
+
+  const refreshCompanies = React.useCallback(async () => {
+    try {
+      const res = await companyService.list(1, 100);
+      const mapped: MembershipCompanySummary[] = res.items.map((c) => ({
+        company_id: c.id,
+        company_name: c.legal_name,
+        role_code: "COMPANY_ADMIN",
+        role_name: "Company Admin",
+        status: (c.is_active ? "ACTIVE" : "INACTIVE") as MembershipStatus,
+      }));
+      setCompanies(mapped);
+      const cached = sessionStorageHelper.load();
+      sessionStorageHelper.save({ companies: mapped, activeCompany: cached?.activeCompany ?? activeCompany });
+    } catch {
+      // Best-effort refresh
+    }
+  }, [activeCompany]);
 
   const hasPermission = React.useCallback(
     (permission: string) => {
@@ -99,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     switchCompany,
+    refreshCompanies,
     hasPermission,
   };
 

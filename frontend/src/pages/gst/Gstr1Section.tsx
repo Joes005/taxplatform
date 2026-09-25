@@ -1,4 +1,5 @@
-import { AlertTriangle, FileWarning } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Download, FileWarning } from "lucide-react";
 
 import {
   useGstr1B2B,
@@ -10,12 +11,15 @@ import {
   useGstr1HSN,
   useGstr1Validation,
 } from "@/hooks/useGstr1";
+import { useToast } from "@/hooks/useToast";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { formatDate, formatMoney, triggerBlobDownload } from "@/lib/utils";
 import { EmptyTableState } from "@/pages/accounting/LedgersPage";
+import { gstReturnPeriodService } from "@/services/gstReturnPeriodService";
 import type { GSTR1NoteRow } from "@/types/gst";
 
 const SEVERITY_VARIANT: Record<string, "destructive" | "warning" | "secondary"> = {
@@ -25,19 +29,62 @@ const SEVERITY_VARIANT: Record<string, "destructive" | "warning" | "secondary"> 
 };
 
 export function Gstr1Section({ companyId, periodId }: { companyId: string; periodId: string }) {
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState(false);
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setDownloading(true);
+    try {
+      const { blob, filename } = await gstReturnPeriodService.exportGstr1(companyId, periodId, format);
+      triggerBlobDownload(blob, filename ?? `gstr1-preparation.${format}`);
+      toast({ title: `GSTR-1 exported (${format.toUpperCase()})`, variant: "success" });
+    } catch {
+      toast({ title: "Failed to export GSTR-1", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
-    <Tabs defaultValue="b2b">
-      <TabsList className="flex-wrap h-auto">
-        <TabsTrigger value="b2b">B2B</TabsTrigger>
-        <TabsTrigger value="b2c-large">B2C Large</TabsTrigger>
-        <TabsTrigger value="b2c-others">B2C Others</TabsTrigger>
-        <TabsTrigger value="exports">Exports</TabsTrigger>
-        <TabsTrigger value="credit-notes">Credit Notes</TabsTrigger>
-        <TabsTrigger value="debit-notes">Debit Notes</TabsTrigger>
-        <TabsTrigger value="hsn">HSN Summary</TabsTrigger>
-        <TabsTrigger value="documents">Documents</TabsTrigger>
-        <TabsTrigger value="validation">Validation</TabsTrigger>
-      </TabsList>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          GSTR-1 return preparation data across outward supplies, credit/debit notes, HSN summaries, and validation rules.
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={downloading}
+            onClick={() => handleExport("csv")}
+            className="gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={downloading}
+            onClick={() => handleExport("xlsx")}
+            className="gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" /> Export Excel
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue="b2b">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="b2b">B2B</TabsTrigger>
+          <TabsTrigger value="b2c-large">B2C Large</TabsTrigger>
+          <TabsTrigger value="b2c-others">B2C Others</TabsTrigger>
+          <TabsTrigger value="exports">Exports</TabsTrigger>
+          <TabsTrigger value="credit-notes">Credit Notes</TabsTrigger>
+          <TabsTrigger value="debit-notes">Debit Notes</TabsTrigger>
+          <TabsTrigger value="hsn">HSN Summary</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="validation">Validation</TabsTrigger>
+        </TabsList>
 
       <TabsContent value="b2b"><B2BTab companyId={companyId} periodId={periodId} /></TabsContent>
       <TabsContent value="b2c-large"><B2CLargeTab companyId={companyId} periodId={periodId} /></TabsContent>
@@ -54,7 +101,8 @@ export function Gstr1Section({ companyId, periodId }: { companyId: string; perio
       <TabsContent value="documents"><DocumentsTab companyId={companyId} periodId={periodId} /></TabsContent>
       <TabsContent value="validation"><ValidationTab companyId={companyId} periodId={periodId} /></TabsContent>
     </Tabs>
-  );
+  </div>
+);
 }
 
 function B2BTab({ companyId, periodId }: { companyId: string; periodId: string }) {

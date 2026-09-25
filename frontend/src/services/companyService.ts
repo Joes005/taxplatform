@@ -20,7 +20,9 @@ export const companyService = {
 
   get: (companyId: string) => apiClient.get<Company>(`/companies/${companyId}`),
 
-  create: (payload: CompanyPayload) => apiClient.post<Company>("/companies", payload),
+  create: (payload: CompanyPayload) => apiClient.post<Company>("/companies/onboard", payload),
+
+  onboard: (payload: CompanyPayload) => apiClient.post<Company>("/companies/onboard", payload),
 
   update: (companyId: string, payload: Partial<CompanyPayload & { is_active: boolean }>) =>
     apiClient.patch<Company>(`/companies/${companyId}`, payload),

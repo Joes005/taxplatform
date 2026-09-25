@@ -407,11 +407,10 @@ class ComplianceTaskService:
         task = await self.get(company_id, task_id)
         return await self.evidence_repo.list_for_task(task.id)
 
-    async def sweep_overdue(self, company_id: uuid.UUID, current_user: User) -> int:
-        """Deterministic overdue detection (PHASE9 §16) — no Celery/Redis:
-        a plain, synchronous query+update called from the dashboard and
-        calendar endpoints, which are exactly the moments a user actually
-        wants an up-to-date overdue count."""
+    async def sweep_overdue(self, company_id: uuid.UUID, current_user: User | None = None) -> int:
+        """Deterministic overdue detection (PHASE9 §16) — callable on-demand
+        or via the background scheduler. Updates past-due open tasks to OVERDUE
+        and sends deduplicated notifications to assigned users."""
         today = date.today()
         open_tasks = await self.repo.list_open_for_sweep(company_id)
         swept = 0
@@ -431,5 +430,13 @@ class ComplianceTaskService:
                         entity_id=task.id,
                     )
         if swept:
+            await self.audit.log(
+                action=AuditAction.COMPLIANCE_TASK_UPDATED,
+                user_id=current_user.id if current_user else None,
+                company_id=company_id,
+                resource_type="compliance_task",
+                resource_id=None,
+                description=f"Overdue sweep marked {swept} tasks as OVERDUE",
+            )
             await self.db.flush()
         return swept

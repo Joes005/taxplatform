@@ -13,9 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.compliance_enums import ComplianceCategory, ComplianceModule, CompliancePriority, ComplianceTaskStatus
 from app.repositories.compliance_task_repository import ComplianceTaskRepository
 from app.services.compliance_task_service import is_overdue
-from app.services.gst_export_service import ExportFile, ExportSection, write_csv, write_xlsx
-
-ExportFormat = Literal["csv", "xlsx"]
+from app.utils.export import ExportFile, ExportFormat, ExportSection, write_csv, write_xlsx
 
 
 class ComplianceReportService:

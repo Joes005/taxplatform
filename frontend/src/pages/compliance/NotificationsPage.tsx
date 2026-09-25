@@ -17,12 +17,13 @@ const SEVERITY_VARIANT: Record<NotificationSeverity, "secondary" | "warning" | "
 
 export default function NotificationsPage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={Bell} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data, isLoading } = useNotifications(companyId);
-  const markRead = useMarkNotificationRead(companyId);
-  const markAllRead = useMarkAllNotificationsRead(companyId);
+  const markRead = useMarkNotificationRead(companyId ?? "");
+  const markAllRead = useMarkAllNotificationsRead(companyId ?? "");
+
+  if (!activeCompany) return <EmptyCompanyState icon={Bell} />;
 
   return (
     <div className="space-y-6">

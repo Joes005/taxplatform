@@ -27,13 +27,14 @@ const STATUS_VARIANT: Record<TaxComputationStatus, "secondary" | "warning" | "su
 
 export default function IncomeTaxDashboardPage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: financialYears } = useFinancialYears(companyId);
   const { data: profile } = useIncomeTaxProfile(companyId);
   const { data: computations, isLoading } = useTaxComputations(companyId);
   const [fyFilter, setFyFilter] = useState<string>("all");
+
+  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
 
   const currentFy = financialYears?.items.find((fy) => fy.is_current);
 

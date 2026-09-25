@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -79,8 +79,26 @@ export default function AuditEngagementsPage() {
     control,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { engagement_type: "INTERNAL_REVIEW" } });
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      engagement_type: "INTERNAL_REVIEW",
+    },
+  });
+
+  useEffect(() => {
+    if (financialYears?.items && financialYears.items.length > 0) {
+      const current = financialYears.items.find((f) => f.is_current) ?? financialYears.items[0];
+      if (current && !watch("financial_year_id")) {
+        setValue("financial_year_id", current.id);
+        if (!watch("period_start")) setValue("period_start", current.start_date);
+        if (!watch("period_end")) setValue("period_end", current.end_date);
+      }
+    }
+  }, [financialYears, setValue, watch]);
 
   if (!activeCompany) return <EmptyCompanyState icon={ClipboardCheck} />;
 
@@ -158,6 +176,13 @@ export default function AuditEngagementsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {serverError && <Alert variant="destructive"><AlertDescription>{serverError}</AlertDescription></Alert>}
+            {financialYears?.items?.length === 0 && (
+              <Alert variant="warning">
+                <AlertDescription>
+                  No Financial Year found. <Link to="/accounting/financial-years" className="font-semibold underline">Create a Financial Year</Link> first.
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="eng-title">Title</Label>
               <Input id="eng-title" {...register("title")} />
@@ -168,7 +193,12 @@ export default function AuditEngagementsPage() {
               <Textarea id="eng-description" rows={2} {...register("description")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="eng-fy">Financial year</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="eng-fy">Financial year</Label>
+                <Link to="/accounting/financial-years" className="text-xs text-primary hover:underline">
+                  Manage FY
+                </Link>
+              </div>
               <Controller
                 control={control}
                 name="financial_year_id"

@@ -24,14 +24,15 @@ const RECON_STATUS_VARIANT: Record<BankReconciliationStatus, "secondary" | "warn
 
 export default function BankDashboardPage() {
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: accounts, isLoading: accountsLoading } = useBankAccounts(companyId);
   const { data: reconciliations, isLoading: reconLoading } = useBankReconciliations(companyId);
   const { data: unmatched } = useBankTransactions(companyId, 1, { reconciliationStatus: "UNMATCHED" });
   const { data: matched } = useBankTransactions(companyId, 1, { reconciliationStatus: "MATCHED" });
   const { data: reviewRequired } = useBankTransactions(companyId, 1, { reconciliationStatus: "REVIEW_REQUIRED" });
+
+  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
 
   const cards: [string, string | number][] = [
     ["Bank Accounts", accountsLoading ? "…" : accounts?.pagination.total ?? 0],

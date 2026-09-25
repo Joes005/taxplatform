@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -60,11 +60,25 @@ export default function PurchaseInvoiceFormPage() {
     control,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { items: [{ quantity: 1, unit_price: 0 }] },
+    defaultValues: {
+      items: [{ quantity: 1, unit_price: 0 }],
+      invoice_date: new Date().toISOString().slice(0, 10),
+    },
   });
+
+  useEffect(() => {
+    if (financialYears?.items && financialYears.items.length > 0) {
+      const current = financialYears.items.find((f) => f.is_current) ?? financialYears.items[0];
+      if (current && !watch("financial_year_id")) {
+        setValue("financial_year_id", current.id);
+      }
+    }
+  }, [financialYears, setValue, watch]);
+
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
   const watchedItems = watch("items");
 
@@ -117,7 +131,12 @@ export default function PurchaseInvoiceFormPage() {
           <CardHeader><CardTitle>Details</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Financial Year</Label>
+              <div className="flex items-center justify-between">
+                <Label>Financial Year</Label>
+                <Link to="/accounting/financial-years" className="text-xs text-primary hover:underline">
+                  Manage FY
+                </Link>
+              </div>
               <Controller
                 control={control}
                 name="financial_year_id"
@@ -133,13 +152,20 @@ export default function PurchaseInvoiceFormPage() {
               {errors.financial_year_id && <p className="text-xs text-destructive">{errors.financial_year_id.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Vendor</Label>
+              <div className="flex items-center justify-between">
+                <Label>Vendor</Label>
+                <Link to="/accounting/vendors" className="text-xs text-primary hover:underline">
+                  + Add Vendor
+                </Link>
+              </div>
               <Controller
                 control={control}
                 name="vendor_id"
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder={vendors?.items?.length ? "Select vendor" : "No vendors available"} />
+                    </SelectTrigger>
                     <SelectContent>
                       {(vendors?.items ?? []).map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
                     </SelectContent>
@@ -147,6 +173,11 @@ export default function PurchaseInvoiceFormPage() {
                 )}
               />
               {errors.vendor_id && <p className="text-xs text-destructive">{errors.vendor_id.message}</p>}
+              {vendors?.items?.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No vendors found. <Link to="/accounting/vendors" className="text-primary underline">Add a vendor</Link> first.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pinv-number">Invoice Number</Label>

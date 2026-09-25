@@ -25,6 +25,14 @@ export function useCreateCompany() {
   });
 }
 
+export function useOnboardCompany() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CompanyPayload) => companyService.onboard(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["companies"] }),
+  });
+}
+
 export function useUpdateCompany(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({

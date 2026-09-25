@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { BookOpen, Plus, Search } from "lucide-react";
+import { BookOpen, Building2, Plus, Search } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
@@ -193,11 +194,39 @@ export default function LedgersPage() {
 }
 
 export function EmptyCompanyState({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
+  const { companies } = useAuth();
+  const navigate = useNavigate();
+
+  const hasCompanies = companies && companies.length > 0;
+
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-24 text-center">
-      <Icon className="h-8 w-8 text-muted-foreground" />
-      <p className="text-sm font-medium">No active company selected</p>
-      <p className="text-xs text-muted-foreground">Choose a company from the switcher above.</p>
+    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/80 bg-muted/20 py-20 px-6 text-center max-w-lg mx-auto my-12 shadow-xs">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Icon className="h-7 w-7" />
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-base font-semibold tracking-tight text-foreground">
+          {hasCompanies ? "No active company selected" : "No company created yet"}
+        </p>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          {hasCompanies
+            ? "Please select a company from the top navigation bar or your companies list to view this workspace."
+            : "Create your first company workspace to start using this module with automatic financial year and chart of accounts."}
+        </p>
+      </div>
+      <div className="pt-2">
+        {hasCompanies ? (
+          <Button onClick={() => navigate("/companies")} className="gap-2">
+            <Building2 className="h-4 w-4" />
+            Select a Company
+          </Button>
+        ) : (
+          <Button onClick={() => navigate("/companies?create=true")} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Create Your Company
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

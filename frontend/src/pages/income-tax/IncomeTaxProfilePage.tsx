@@ -40,12 +40,11 @@ type FormValues = z.infer<typeof schema>;
 export default function IncomeTaxProfilePage() {
   const { activeCompany } = useAuth();
   const { toast } = useToast();
-  if (!activeCompany) return <EmptyCompanyState icon={Landmark} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: profile, isLoading, isError } = useIncomeTaxProfile(companyId);
-  const createMutation = useCreateIncomeTaxProfile(companyId);
-  const updateMutation = useUpdateIncomeTaxProfile(companyId);
+  const createMutation = useCreateIncomeTaxProfile(companyId ?? "");
+  const updateMutation = useUpdateIncomeTaxProfile(companyId ?? "");
 
   const {
     register,
@@ -71,6 +70,7 @@ export default function IncomeTaxProfilePage() {
     }
   }, [profile, reset]);
 
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={Landmark} />;
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
   const onSubmit = async (values: FormValues) => {

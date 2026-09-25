@@ -19,6 +19,7 @@ from app.models.receipt import Receipt
 from app.models.sales_invoice import SalesInvoice
 from app.models.vendor import Vendor
 from app.schemas.reports import LedgerBalance, PartyOutstanding, SalesPurchaseSummary, TrialBalance
+from app.utils.export import ExportFile, ExportFormat, render_export
 
 ZERO = Decimal("0")
 
@@ -246,3 +247,182 @@ class ReportService:
             total_credit=total_credit,
             is_balanced=(total_debit == total_credit),
         )
+
+    async def export_sales_register(
+        self,
+        company_id: uuid.UUID,
+        fmt: ExportFormat,
+        *,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> ExportFile:
+        query = (
+            select(SalesInvoice, Customer.name, Customer.gstin)
+            .join(Customer, Customer.id == SalesInvoice.customer_id)
+            .where(SalesInvoice.company_id == company_id)
+            .order_by(SalesInvoice.invoice_date.desc(), SalesInvoice.invoice_number.desc())
+        )
+        if date_from:
+            query = query.where(SalesInvoice.invoice_date >= date_from)
+        if date_to:
+            query = query.where(SalesInvoice.invoice_date <= date_to)
+
+        result = await self.db.execute(query)
+        rows_data = result.all()
+
+        headers = [
+            "Invoice Number",
+            "Invoice Date",
+            "Customer Name",
+            "Customer GSTIN",
+            "Place of Supply",
+            "Status",
+            "Taxable Amount",
+            "CGST",
+            "SGST",
+            "IGST",
+            "Cess",
+            "Total Tax",
+            "Grand Total",
+        ]
+        rows = []
+        for inv, cust_name, cust_gstin in rows_data:
+            rows.append([
+                inv.invoice_number,
+                inv.invoice_date,
+                cust_name or "",
+                cust_gstin or "",
+                inv.place_of_supply or "",
+                inv.status.value if hasattr(inv.status, "value") else str(inv.status),
+                inv.taxable_amount,
+                inv.cgst_amount,
+                inv.sgst_amount,
+                inv.igst_amount,
+                inv.cess_amount,
+                inv.total_tax,
+                inv.grand_total,
+            ])
+
+        return render_export(
+            headers=headers,
+            rows=rows,
+            title="Sales Register",
+            fmt=fmt,
+            filename_stub=f"sales_register_{company_id}_{date.today().isoformat()}",
+            sheet_name="Sales Register",
+        )
+
+    async def export_purchase_register(
+        self,
+        company_id: uuid.UUID,
+        fmt: ExportFormat,
+        *,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> ExportFile:
+        query = (
+            select(PurchaseInvoice, Vendor.name, Vendor.gstin)
+            .join(Vendor, Vendor.id == PurchaseInvoice.vendor_id)
+            .where(PurchaseInvoice.company_id == company_id)
+            .order_by(PurchaseInvoice.invoice_date.desc(), PurchaseInvoice.invoice_number.desc())
+        )
+        if date_from:
+            query = query.where(PurchaseInvoice.invoice_date >= date_from)
+        if date_to:
+            query = query.where(PurchaseInvoice.invoice_date <= date_to)
+
+        result = await self.db.execute(query)
+        rows_data = result.all()
+
+        headers = [
+            "Invoice Number",
+            "Invoice Date",
+            "Supplier Invoice Number",
+            "Supplier Invoice Date",
+            "Vendor Name",
+            "Vendor GSTIN",
+            "Place of Supply",
+            "Status",
+            "Taxable Amount",
+            "CGST",
+            "SGST",
+            "IGST",
+            "Cess",
+            "Total Tax",
+            "Grand Total",
+        ]
+        rows = []
+        for inv, vend_name, vend_gstin in rows_data:
+            rows.append([
+                inv.invoice_number,
+                inv.invoice_date,
+                inv.supplier_invoice_number or "",
+                inv.supplier_invoice_date or "",
+                vend_name or "",
+                vend_gstin or "",
+                inv.place_of_supply or "",
+                inv.status.value if hasattr(inv.status, "value") else str(inv.status),
+                inv.taxable_amount,
+                inv.cgst_amount,
+                inv.sgst_amount,
+                inv.igst_amount,
+                inv.cess_amount,
+                inv.total_tax,
+                inv.grand_total,
+            ])
+
+        return render_export(
+            headers=headers,
+            rows=rows,
+            title="Purchase Register",
+            fmt=fmt,
+            filename_stub=f"purchase_register_{company_id}_{date.today().isoformat()}",
+            sheet_name="Purchase Register",
+        )
+
+    async def export_trial_balance(
+        self,
+        company_id: uuid.UUID,
+        fmt: ExportFormat,
+        *,
+        as_of: date | None = None,
+    ) -> ExportFile:
+        tb = await self.trial_balance(company_id, as_of=as_of)
+
+        headers = [
+            "Ledger Name",
+            "Ledger Type",
+            "Debit",
+            "Credit",
+            "Balance",
+            "Balance Type",
+        ]
+        rows = []
+        for line in tb.lines:
+            rows.append([
+                line.ledger_name,
+                line.ledger_type,
+                line.debit,
+                line.credit,
+                line.balance,
+                line.balance_type.value if hasattr(line.balance_type, "value") else str(line.balance_type),
+            ])
+        rows.append([
+            "Total",
+            "",
+            tb.total_debit,
+            tb.total_credit,
+            abs(tb.total_debit - tb.total_credit),
+            "BALANCED" if tb.is_balanced else "UNBALANCED",
+        ])
+
+        as_of_str = as_of.isoformat() if as_of else date.today().isoformat()
+        return render_export(
+            headers=headers,
+            rows=rows,
+            title=f"Trial Balance (As of {as_of_str})",
+            fmt=fmt,
+            filename_stub=f"trial_balance_{company_id}_{as_of_str}",
+            sheet_name="Trial Balance",
+        )
+

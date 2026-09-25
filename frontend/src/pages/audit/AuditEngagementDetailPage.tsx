@@ -95,11 +95,11 @@ const ASSIGNMENT_ROLES: AuditAssignmentRole[] = ["LEAD_AUDITOR", "AUDITOR", "REV
 export default function AuditEngagementDetailPage() {
   const { engagementId } = useParams<{ engagementId: string }>();
   const { activeCompany } = useAuth();
-  if (!activeCompany) return <EmptyCompanyState icon={ClipboardCheck} />;
-  const companyId = activeCompany.company_id;
+  const companyId = activeCompany?.company_id;
 
   const { data: engagement, isLoading } = useAuditEngagement(companyId, engagementId);
 
+  if (!activeCompany || !companyId) return <EmptyCompanyState icon={ClipboardCheck} />;
   if (isLoading || !engagement || !engagementId) return <Skeleton className="h-64 w-full" />;
 
   return (
