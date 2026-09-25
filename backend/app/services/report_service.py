@@ -9,8 +9,10 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.accounting_enums import BalanceType, PartyType, TransactionStatus
+from app.models.accounting_enums import BalanceType, NoteType, PartyType, TransactionStatus
+from app.models.credit_note import CreditNote
 from app.models.customer import Customer
+from app.models.debit_note import DebitNote
 from app.models.journal_entry import JournalEntry, JournalEntryLine
 from app.models.ledger import Ledger
 from app.models.payment import Payment
@@ -110,7 +112,31 @@ class ReportService:
         )
         received = dict((await self.db.execute(received_query)).all())
 
-        customer_ids = set(invoiced) | set(received)
+        cn_query = (
+            select(CreditNote.customer_id, func.coalesce(func.sum(CreditNote.total_amount), ZERO))
+            .where(
+                CreditNote.company_id == company_id,
+                CreditNote.status == TransactionStatus.POSTED,
+                CreditNote.note_type == NoteType.SALES,
+                CreditNote.customer_id.is_not(None),
+            )
+            .group_by(CreditNote.customer_id)
+        )
+        credit_notes = dict((await self.db.execute(cn_query)).all())
+
+        dn_query = (
+            select(DebitNote.customer_id, func.coalesce(func.sum(DebitNote.total_amount), ZERO))
+            .where(
+                DebitNote.company_id == company_id,
+                DebitNote.status == TransactionStatus.POSTED,
+                DebitNote.note_type == NoteType.SALES,
+                DebitNote.customer_id.is_not(None),
+            )
+            .group_by(DebitNote.customer_id)
+        )
+        debit_notes = dict((await self.db.execute(dn_query)).all())
+
+        customer_ids = set(invoiced) | set(received) | set(credit_notes) | set(debit_notes)
         if not customer_ids:
             return []
 
@@ -123,13 +149,16 @@ class ReportService:
         for customer_id in customer_ids:
             inv = invoiced.get(customer_id, ZERO)
             rec = received.get(customer_id, ZERO)
+            cn = credit_notes.get(customer_id, ZERO)
+            dn = debit_notes.get(customer_id, ZERO)
+            net_invoiced = inv + dn - cn
             results.append(
                 PartyOutstanding(
                     party_id=customer_id,
                     party_name=names.get(customer_id, "Unknown"),
-                    invoiced_total=inv,
+                    invoiced_total=net_invoiced,
                     settled_total=rec,
-                    outstanding=inv - rec,
+                    outstanding=net_invoiced - rec,
                 )
             )
         return sorted(results, key=lambda r: r.party_name)
@@ -156,7 +185,31 @@ class ReportService:
         )
         paid = dict((await self.db.execute(paid_query)).all())
 
-        vendor_ids = set(invoiced) | set(paid)
+        dn_query = (
+            select(DebitNote.vendor_id, func.coalesce(func.sum(DebitNote.total_amount), ZERO))
+            .where(
+                DebitNote.company_id == company_id,
+                DebitNote.status == TransactionStatus.POSTED,
+                DebitNote.note_type == NoteType.PURCHASE,
+                DebitNote.vendor_id.is_not(None),
+            )
+            .group_by(DebitNote.vendor_id)
+        )
+        debit_notes = dict((await self.db.execute(dn_query)).all())
+
+        cn_query = (
+            select(CreditNote.vendor_id, func.coalesce(func.sum(CreditNote.total_amount), ZERO))
+            .where(
+                CreditNote.company_id == company_id,
+                CreditNote.status == TransactionStatus.POSTED,
+                CreditNote.note_type == NoteType.PURCHASE,
+                CreditNote.vendor_id.is_not(None),
+            )
+            .group_by(CreditNote.vendor_id)
+        )
+        credit_notes = dict((await self.db.execute(cn_query)).all())
+
+        vendor_ids = set(invoiced) | set(paid) | set(debit_notes) | set(credit_notes)
         if not vendor_ids:
             return []
 
@@ -169,13 +222,16 @@ class ReportService:
         for vendor_id in vendor_ids:
             inv = invoiced.get(vendor_id, ZERO)
             pay = paid.get(vendor_id, ZERO)
+            dn = debit_notes.get(vendor_id, ZERO)
+            cn = credit_notes.get(vendor_id, ZERO)
+            net_invoiced = inv - dn - cn
             results.append(
                 PartyOutstanding(
                     party_id=vendor_id,
                     party_name=names.get(vendor_id, "Unknown"),
-                    invoiced_total=inv,
+                    invoiced_total=net_invoiced,
                     settled_total=pay,
-                    outstanding=inv - pay,
+                    outstanding=net_invoiced - pay,
                 )
             )
         return sorted(results, key=lambda r: r.party_name)

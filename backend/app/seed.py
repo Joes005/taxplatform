@@ -338,11 +338,42 @@ async def seed_default_tds_sections_and_rules(db: AsyncSession) -> None:
 
 
 async def seed_default_income_tax_rule_sets(db: AsyncSession) -> None:
-    for entry in DEFAULT_INCOME_TAX_RULE_SETS:
+    ay_configs = [
+        ("2026-27", _INCOME_TAX_RULE_SET_EFFECTIVE_FROM),
+        ("2027-28", date(2026, 4, 1)),
+    ]
+
+    company_rule_sets = [
+        {
+            "tax_regime": TaxRegime.NEW_REGIME,
+            "cess_rate": Decimal("4.00"),
+            "slabs": [(Decimal("0"), None, Decimal("22"))],
+            "rebate": (Decimal("0"), Decimal("0")),
+            "surcharge": [(Decimal("10000000"), Decimal("10"))],
+            "deduction_rules": [],
+        },
+        {
+            "tax_regime": TaxRegime.OLD_REGIME,
+            "cess_rate": Decimal("4.00"),
+            "slabs": [(Decimal("0"), None, Decimal("25"))],
+            "rebate": (Decimal("0"), Decimal("0")),
+            "surcharge": [(Decimal("10000000"), Decimal("7")), (Decimal("100000000"), Decimal("12"))],
+            "deduction_rules": [],
+        },
+    ]
+
+    all_specs = []
+    for ay, eff_from in ay_configs:
+        for entry in DEFAULT_INCOME_TAX_RULE_SETS:
+            all_specs.append((ay, eff_from, TaxpayerType.INDIVIDUAL, entry))
+        for entry in company_rule_sets:
+            all_specs.append((ay, eff_from, TaxpayerType.COMPANY, entry))
+
+    for ay, eff_from, tp_type, entry in all_specs:
         existing = await db.execute(
             select(IncomeTaxRuleSet).where(
-                IncomeTaxRuleSet.assessment_year == _INCOME_TAX_RULE_SET_ASSESSMENT_YEAR,
-                IncomeTaxRuleSet.taxpayer_type == TaxpayerType.INDIVIDUAL,
+                IncomeTaxRuleSet.assessment_year == ay,
+                IncomeTaxRuleSet.taxpayer_type == tp_type,
                 IncomeTaxRuleSet.tax_regime == entry["tax_regime"],
                 IncomeTaxRuleSet.version == 1,
             )
@@ -351,16 +382,16 @@ async def seed_default_income_tax_rule_sets(db: AsyncSession) -> None:
             continue
 
         rule_set = IncomeTaxRuleSet(
-            assessment_year=_INCOME_TAX_RULE_SET_ASSESSMENT_YEAR,
-            taxpayer_type=TaxpayerType.INDIVIDUAL,
+            assessment_year=ay,
+            taxpayer_type=tp_type,
             tax_regime=entry["tax_regime"],
-            effective_from=_INCOME_TAX_RULE_SET_EFFECTIVE_FROM,
+            effective_from=eff_from,
             version=1,
             is_active=True,
             cess_rate=entry["cess_rate"],
             description=(
-                "Illustrative sample rule set for local development/demo only — "
-                "verify against the official CBDT notification before real use."
+                f"Illustrative sample rule set for {tp_type.value} ({ay}) — "
+                "verify against official CBDT notifications before real use."
             ),
         )
         db.add(rule_set)

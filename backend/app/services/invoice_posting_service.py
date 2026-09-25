@@ -12,11 +12,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, ValidationAppError
-from app.models.accounting_enums import BalanceType, DataSource, LedgerType, TransactionStatus
+from app.models.accounting_enums import (
+    BalanceType,
+    DataSource,
+    LedgerType,
+    NoteType,
+    PartyType,
+    TransactionStatus,
+)
+from app.models.credit_note import CreditNote
 from app.models.customer import Customer
+from app.models.debit_note import DebitNote
 from app.models.journal_entry import JournalEntry, JournalEntryLine
 from app.models.ledger import Ledger
+from app.models.payment import Payment
 from app.models.purchase_invoice import PurchaseInvoice
+from app.models.receipt import Receipt
 from app.models.sales_invoice import SalesInvoice
 from app.models.user import User
 from app.models.vendor import Vendor
@@ -563,3 +574,555 @@ class InvoicePostingService:
                 user_agent=meta.user_agent,
             )
         return journal
+
+    async def post_receipt(
+        self, company_id: uuid.UUID, receipt: Receipt, current_user: User, meta: RequestMeta
+    ) -> JournalEntry:
+        source_ref = f"receipt:{receipt.id}"
+        existing_journal = (
+            await self.db.execute(
+                select(JournalEntry).where(
+                    JournalEntry.company_id == company_id,
+                    JournalEntry.source_reference == source_ref,
+                    JournalEntry.status == TransactionStatus.POSTED,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_journal is not None:
+            raise ConflictError(
+                "A posted journal entry already exists for this receipt",
+                code="ALREADY_POSTED",
+            )
+
+        cust_ledger = await self._resolve_customer_ledger(company_id, receipt.customer_id)
+
+        lines: list[JournalEntryLine] = [
+            JournalEntryLine(
+                ledger_id=receipt.ledger_id,
+                debit_amount=receipt.amount,
+                credit_amount=ZERO,
+                description=f"Received against receipt {receipt.receipt_number}",
+            ),
+            JournalEntryLine(
+                ledger_id=cust_ledger.id,
+                debit_amount=ZERO,
+                credit_amount=receipt.amount,
+                description=f"Settlement for receipt {receipt.receipt_number}",
+            ),
+        ]
+
+        total_debit = receipt.amount
+        total_credit = receipt.amount
+        AccountingCalculationService.validate_journal_balance(total_debit, total_credit)
+
+        journal_number = await self._generate_unique_journal_number(
+            company_id, receipt.financial_year_id, f"JV-REC-{receipt.receipt_number}"
+        )
+
+        entry = JournalEntry(
+            company_id=company_id,
+            financial_year_id=receipt.financial_year_id,
+            journal_number=journal_number,
+            journal_date=receipt.receipt_date,
+            narration=f"Auto-posted for Receipt {receipt.receipt_number}",
+            status=TransactionStatus.POSTED,
+            source=DataSource.MANUAL,
+            source_reference=source_ref,
+            lines=lines,
+        )
+        self.db.add(entry)
+        await self.db.flush()
+
+        await self.audit.log(
+            action=AuditAction.ACCOUNTING_POST,
+            user_id=current_user.id,
+            company_id=company_id,
+            resource_type="journal_entry",
+            resource_id=str(entry.id),
+            description=f"Journal entry '{entry.journal_number}' auto-posted for receipt '{receipt.receipt_number}'",
+            metadata={"total_debit": str(total_debit), "total_credit": str(total_credit)},
+            ip_address=meta.ip_address,
+            user_agent=meta.user_agent,
+        )
+        return entry
+
+    async def post_payment(
+        self, company_id: uuid.UUID, payment: Payment, current_user: User, meta: RequestMeta
+    ) -> JournalEntry:
+        source_ref = f"payment:{payment.id}"
+        existing_journal = (
+            await self.db.execute(
+                select(JournalEntry).where(
+                    JournalEntry.company_id == company_id,
+                    JournalEntry.source_reference == source_ref,
+                    JournalEntry.status == TransactionStatus.POSTED,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_journal is not None:
+            raise ConflictError(
+                "A posted journal entry already exists for this payment",
+                code="ALREADY_POSTED",
+            )
+
+        if payment.party_type == PartyType.VENDOR and payment.party_id:
+            party_ledger = await self._resolve_vendor_ledger(company_id, payment.party_id)
+        elif payment.party_type == PartyType.CUSTOMER and payment.party_id:
+            party_ledger = await self._resolve_customer_ledger(company_id, payment.party_id)
+        else:
+            party_ledger = await self._get_or_create_ledger(
+                company_id,
+                name="Accounts Payable",
+                ledger_type=LedgerType.PAYABLE,
+                opening_balance_type=BalanceType.CREDIT,
+            )
+
+        lines: list[JournalEntryLine] = [
+            JournalEntryLine(
+                ledger_id=party_ledger.id,
+                debit_amount=payment.amount,
+                credit_amount=ZERO,
+                description=f"Disbursement for payment {payment.payment_number}",
+            ),
+            JournalEntryLine(
+                ledger_id=payment.ledger_id,
+                debit_amount=ZERO,
+                credit_amount=payment.amount,
+                description=f"Paid via payment {payment.payment_number}",
+            ),
+        ]
+
+        total_debit = payment.amount
+        total_credit = payment.amount
+        AccountingCalculationService.validate_journal_balance(total_debit, total_credit)
+
+        journal_number = await self._generate_unique_journal_number(
+            company_id, payment.financial_year_id, f"JV-PAY-{payment.payment_number}"
+        )
+
+        entry = JournalEntry(
+            company_id=company_id,
+            financial_year_id=payment.financial_year_id,
+            journal_number=journal_number,
+            journal_date=payment.payment_date,
+            narration=f"Auto-posted for Payment {payment.payment_number}",
+            status=TransactionStatus.POSTED,
+            source=DataSource.MANUAL,
+            source_reference=source_ref,
+            lines=lines,
+        )
+        self.db.add(entry)
+        await self.db.flush()
+
+        await self.audit.log(
+            action=AuditAction.ACCOUNTING_POST,
+            user_id=current_user.id,
+            company_id=company_id,
+            resource_type="journal_entry",
+            resource_id=str(entry.id),
+            description=f"Journal entry '{entry.journal_number}' auto-posted for payment '{payment.payment_number}'",
+            metadata={"total_debit": str(total_debit), "total_credit": str(total_credit)},
+            ip_address=meta.ip_address,
+            user_agent=meta.user_agent,
+        )
+        return entry
+
+    async def post_credit_note(
+        self, company_id: uuid.UUID, note: CreditNote, current_user: User, meta: RequestMeta
+    ) -> JournalEntry:
+        source_ref = f"credit_note:{note.id}"
+        existing_journal = (
+            await self.db.execute(
+                select(JournalEntry).where(
+                    JournalEntry.company_id == company_id,
+                    JournalEntry.source_reference == source_ref,
+                    JournalEntry.status == TransactionStatus.POSTED,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_journal is not None:
+            raise ConflictError(
+                "A posted journal entry already exists for this credit note",
+                code="ALREADY_POSTED",
+            )
+
+        lines: list[JournalEntryLine] = []
+
+        if note.note_type == NoteType.SALES:
+            cust_ledger = await self._resolve_customer_ledger(company_id, note.customer_id)
+            sales_ledger = await self._get_or_create_ledger(
+                company_id,
+                name="Sales Account",
+                ledger_type=LedgerType.INCOME,
+                opening_balance_type=BalanceType.CREDIT,
+            )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=sales_ledger.id,
+                    debit_amount=note.taxable_amount,
+                    credit_amount=ZERO,
+                    description=f"Sales reversal on credit note {note.credit_note_number}",
+                )
+            )
+            if note.cgst_amount > ZERO:
+                cgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output CGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cgst_ledger.id,
+                        debit_amount=note.cgst_amount,
+                        credit_amount=ZERO,
+                        description=f"Output CGST reversal on credit note {note.credit_note_number}",
+                    )
+                )
+            if note.sgst_amount > ZERO:
+                sgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output SGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=sgst_ledger.id,
+                        debit_amount=note.sgst_amount,
+                        credit_amount=ZERO,
+                        description=f"Output SGST reversal on credit note {note.credit_note_number}",
+                    )
+                )
+            if note.igst_amount > ZERO:
+                igst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output IGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=igst_ledger.id,
+                        debit_amount=note.igst_amount,
+                        credit_amount=ZERO,
+                        description=f"Output IGST reversal on credit note {note.credit_note_number}",
+                    )
+                )
+            if note.cess_amount > ZERO:
+                cess_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output Cess", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cess_ledger.id,
+                        debit_amount=note.cess_amount,
+                        credit_amount=ZERO,
+                        description=f"Output Cess reversal on credit note {note.credit_note_number}",
+                    )
+                )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=cust_ledger.id,
+                    debit_amount=ZERO,
+                    credit_amount=note.total_amount,
+                    description=f"Receivable reduction on credit note {note.credit_note_number}",
+                )
+            )
+        else:
+            vend_ledger = await self._resolve_vendor_ledger(company_id, note.vendor_id)
+            purchase_ledger = await self._get_or_create_ledger(
+                company_id,
+                name="Purchase Account",
+                ledger_type=LedgerType.EXPENSE,
+                opening_balance_type=BalanceType.DEBIT,
+            )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=vend_ledger.id,
+                    debit_amount=note.total_amount,
+                    credit_amount=ZERO,
+                    description=f"Payable reduction on credit note {note.credit_note_number}",
+                )
+            )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=purchase_ledger.id,
+                    debit_amount=ZERO,
+                    credit_amount=note.taxable_amount,
+                    description=f"Purchase reduction on credit note {note.credit_note_number}",
+                )
+            )
+            if note.cgst_amount > ZERO:
+                cgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input CGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cgst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.cgst_amount,
+                        description=f"Input CGST reversal on credit note {note.credit_note_number}",
+                    )
+                )
+            if note.sgst_amount > ZERO:
+                sgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input SGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=sgst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.sgst_amount,
+                        description=f"Input SGST reversal on credit note {note.credit_note_number}",
+                    )
+                )
+            if note.igst_amount > ZERO:
+                igst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input IGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=igst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.igst_amount,
+                        description=f"Input IGST reversal on credit note {note.credit_note_number}",
+                    )
+                )
+            if note.cess_amount > ZERO:
+                cess_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input Cess", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cess_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.cess_amount,
+                        description=f"Input Cess reversal on credit note {note.credit_note_number}",
+                    )
+                )
+
+        total_debit = sum((l.debit_amount for l in lines), ZERO)
+        total_credit = sum((l.credit_amount for l in lines), ZERO)
+        AccountingCalculationService.validate_journal_balance(total_debit, total_credit)
+
+        journal_number = await self._generate_unique_journal_number(
+            company_id, note.financial_year_id, f"JV-CN-{note.credit_note_number}"
+        )
+        entry = JournalEntry(
+            company_id=company_id,
+            financial_year_id=note.financial_year_id,
+            journal_number=journal_number,
+            journal_date=note.credit_note_date,
+            narration=f"Auto-posted for Credit Note {note.credit_note_number}",
+            status=TransactionStatus.POSTED,
+            source=DataSource.MANUAL,
+            source_reference=source_ref,
+            lines=lines,
+        )
+        self.db.add(entry)
+        await self.db.flush()
+
+        await self.audit.log(
+            action=AuditAction.ACCOUNTING_POST,
+            user_id=current_user.id,
+            company_id=company_id,
+            resource_type="journal_entry",
+            resource_id=str(entry.id),
+            description=f"Journal entry '{entry.journal_number}' auto-posted for credit note '{note.credit_note_number}'",
+            metadata={"total_debit": str(total_debit), "total_credit": str(total_credit)},
+            ip_address=meta.ip_address,
+            user_agent=meta.user_agent,
+        )
+        return entry
+
+    async def post_debit_note(
+        self, company_id: uuid.UUID, note: DebitNote, current_user: User, meta: RequestMeta
+    ) -> JournalEntry:
+        source_ref = f"debit_note:{note.id}"
+        existing_journal = (
+            await self.db.execute(
+                select(JournalEntry).where(
+                    JournalEntry.company_id == company_id,
+                    JournalEntry.source_reference == source_ref,
+                    JournalEntry.status == TransactionStatus.POSTED,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_journal is not None:
+            raise ConflictError(
+                "A posted journal entry already exists for this debit note",
+                code="ALREADY_POSTED",
+            )
+
+        lines: list[JournalEntryLine] = []
+
+        if note.note_type == NoteType.PURCHASE:
+            vend_ledger = await self._resolve_vendor_ledger(company_id, note.vendor_id)
+            purchase_ledger = await self._get_or_create_ledger(
+                company_id,
+                name="Purchase Account",
+                ledger_type=LedgerType.EXPENSE,
+                opening_balance_type=BalanceType.DEBIT,
+            )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=vend_ledger.id,
+                    debit_amount=note.total_amount,
+                    credit_amount=ZERO,
+                    description=f"Payable reduction on debit note {note.debit_note_number}",
+                )
+            )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=purchase_ledger.id,
+                    debit_amount=ZERO,
+                    credit_amount=note.taxable_amount,
+                    description=f"Purchase reduction on debit note {note.debit_note_number}",
+                )
+            )
+            if note.cgst_amount > ZERO:
+                cgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input CGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cgst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.cgst_amount,
+                        description=f"Input CGST reversal on debit note {note.debit_note_number}",
+                    )
+                )
+            if note.sgst_amount > ZERO:
+                sgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input SGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=sgst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.sgst_amount,
+                        description=f"Input SGST reversal on debit note {note.debit_note_number}",
+                    )
+                )
+            if note.igst_amount > ZERO:
+                igst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input IGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=igst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.igst_amount,
+                        description=f"Input IGST reversal on debit note {note.debit_note_number}",
+                    )
+                )
+            if note.cess_amount > ZERO:
+                cess_ledger = await self._get_or_create_ledger(
+                    company_id, name="Input Cess", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.DEBIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cess_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.cess_amount,
+                        description=f"Input Cess reversal on debit note {note.debit_note_number}",
+                    )
+                )
+        else:
+            cust_ledger = await self._resolve_customer_ledger(company_id, note.customer_id)
+            sales_ledger = await self._get_or_create_ledger(
+                company_id,
+                name="Sales Account",
+                ledger_type=LedgerType.INCOME,
+                opening_balance_type=BalanceType.CREDIT,
+            )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=cust_ledger.id,
+                    debit_amount=note.total_amount,
+                    credit_amount=ZERO,
+                    description=f"Receivable addition on debit note {note.debit_note_number}",
+                )
+            )
+            lines.append(
+                JournalEntryLine(
+                    ledger_id=sales_ledger.id,
+                    debit_amount=ZERO,
+                    credit_amount=note.taxable_amount,
+                    description=f"Sales addition on debit note {note.debit_note_number}",
+                )
+            )
+            if note.cgst_amount > ZERO:
+                cgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output CGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cgst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.cgst_amount,
+                        description=f"Output CGST on debit note {note.debit_note_number}",
+                    )
+                )
+            if note.sgst_amount > ZERO:
+                sgst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output SGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=sgst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.sgst_amount,
+                        description=f"Output SGST on debit note {note.debit_note_number}",
+                    )
+                )
+            if note.igst_amount > ZERO:
+                igst_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output IGST", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=igst_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.igst_amount,
+                        description=f"Output IGST on debit note {note.debit_note_number}",
+                    )
+                )
+            if note.cess_amount > ZERO:
+                cess_ledger = await self._get_or_create_ledger(
+                    company_id, name="Output Cess", ledger_type=LedgerType.TAX, opening_balance_type=BalanceType.CREDIT
+                )
+                lines.append(
+                    JournalEntryLine(
+                        ledger_id=cess_ledger.id,
+                        debit_amount=ZERO,
+                        credit_amount=note.cess_amount,
+                        description=f"Output Cess on debit note {note.debit_note_number}",
+                    )
+                )
+
+        total_debit = sum((l.debit_amount for l in lines), ZERO)
+        total_credit = sum((l.credit_amount for l in lines), ZERO)
+        AccountingCalculationService.validate_journal_balance(total_debit, total_credit)
+
+        journal_number = await self._generate_unique_journal_number(
+            company_id, note.financial_year_id, f"JV-DN-{note.debit_note_number}"
+        )
+        entry = JournalEntry(
+            company_id=company_id,
+            financial_year_id=note.financial_year_id,
+            journal_number=journal_number,
+            journal_date=note.debit_note_date,
+            narration=f"Auto-posted for Debit Note {note.debit_note_number}",
+            status=TransactionStatus.POSTED,
+            source=DataSource.MANUAL,
+            source_reference=source_ref,
+            lines=lines,
+        )
+        self.db.add(entry)
+        await self.db.flush()
+
+        await self.audit.log(
+            action=AuditAction.ACCOUNTING_POST,
+            user_id=current_user.id,
+            company_id=company_id,
+            resource_type="journal_entry",
+            resource_id=str(entry.id),
+            description=f"Journal entry '{entry.journal_number}' auto-posted for debit note '{note.debit_note_number}'",
+            metadata={"total_debit": str(total_debit), "total_credit": str(total_credit)},
+            ip_address=meta.ip_address,
+            user_agent=meta.user_agent,
+        )
+        return entry

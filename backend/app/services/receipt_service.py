@@ -12,7 +12,11 @@ from app.repositories.receipt_repository import ReceiptRepository
 from app.schemas.receipt import ReceiptCreate
 from app.services.accounting_guards import assert_date_in_financial_year, assert_period_open
 from app.services.audit_service import AuditAction, AuditService
+from decimal import Decimal
+from sqlalchemy import func, select
+from app.models.sales_invoice import SalesInvoice
 from app.services.auth_service import RequestMeta
+from app.services.invoice_posting_service import InvoicePostingService
 
 
 class ReceiptService:
@@ -22,6 +26,7 @@ class ReceiptService:
         self.ledgers = LedgerRepository(db)
         self.financial_years = FinancialYearRepository(db)
         self.customers = CustomerRepository(db)
+        self.posting = InvoicePostingService(db)
         self.audit = AuditService(db)
 
     async def create(
@@ -43,8 +48,36 @@ class ReceiptService:
         assert_date_in_financial_year(fy, payload.receipt_date)
         await assert_period_open(self.db, company_id=company_id, on_date=payload.receipt_date)
 
+        if payload.reference_number:
+            inv_res = await self.db.execute(
+                select(SalesInvoice).where(
+                    SalesInvoice.company_id == company_id,
+                    SalesInvoice.customer_id == payload.customer_id,
+                    SalesInvoice.invoice_number == payload.reference_number,
+                )
+            )
+            matching_inv = inv_res.scalar_one_or_none()
+            if matching_inv:
+                already_received = (
+                    await self.db.execute(
+                        select(func.coalesce(func.sum(Receipt.amount), Decimal("0"))).where(
+                            Receipt.company_id == company_id,
+                            Receipt.customer_id == payload.customer_id,
+                            Receipt.reference_number == payload.reference_number,
+                        )
+                    )
+                ).scalar_one()
+                remaining = matching_inv.grand_total - already_received
+                if payload.amount > remaining:
+                    raise ValidationAppError(
+                        f"Receipt amount {payload.amount} exceeds invoice remaining balance of {remaining}",
+                        code="INVOICE_OVERPAYMENT",
+                    )
+
         receipt = Receipt(company_id=company_id, **payload.model_dump())
         await self.repo.create(receipt)
+
+        await self.posting.post_receipt(company_id, receipt, current_user, meta)
 
         await self.audit.log(
             action=AuditAction.ACCOUNTING_CREATE,

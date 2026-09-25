@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bank_enums import (
@@ -280,6 +280,13 @@ class BankMatchingService:
                 amount_column == bank_transaction.amount,
                 JournalEntry.journal_date >= window_start,
                 JournalEntry.journal_date <= window_end,
+                or_(
+                    JournalEntry.source_reference.is_(None),
+                    and_(
+                        ~JournalEntry.source_reference.like("receipt:%"),
+                        ~JournalEntry.source_reference.like("payment:%"),
+                    ),
+                ),
             )
         )
         return [

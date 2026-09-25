@@ -17,6 +17,12 @@ from app.services.audit_service import AuditAction, AuditService
 from app.services.auth_service import RequestMeta
 
 
+from sqlalchemy import select
+from app.models.purchase_invoice import PurchaseInvoice
+from app.models.sales_invoice import SalesInvoice
+from app.services.invoice_posting_service import InvoicePostingService
+
+
 class CreditNoteService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -24,6 +30,7 @@ class CreditNoteService:
         self.customers = CustomerRepository(db)
         self.vendors = VendorRepository(db)
         self.financial_years = FinancialYearRepository(db)
+        self.posting = InvoicePostingService(db)
         self.audit = AuditService(db)
 
     async def create(
@@ -37,15 +44,6 @@ class CreditNoteService:
         assert_date_in_financial_year(fy, payload.credit_note_date)
         await assert_period_open(self.db, company_id=company_id, on_date=payload.credit_note_date)
 
-        if payload.note_type == NoteType.SALES:
-            customer = await self.customers.get_by_id_for_company(payload.customer_id, company_id)
-            if customer is None:
-                raise ValidationAppError("Customer not found in this company", code="MISSING_CUSTOMER")
-        else:
-            vendor = await self.vendors.get_by_id_for_company(payload.vendor_id, company_id)
-            if vendor is None:
-                raise ValidationAppError("Vendor not found in this company", code="MISSING_VENDOR")
-
         line_inputs = [
             LineItemInput(
                 quantity=i.quantity,
@@ -58,6 +56,62 @@ class CreditNoteService:
             for i in payload.items
         ]
         totals = AccountingCalculationService.calculate_document(line_inputs)
+        total_note_amount = totals.taxable_amount + totals.total_tax
+
+        if payload.note_type == NoteType.SALES:
+            customer = await self.customers.get_by_id_for_company(payload.customer_id, company_id)
+            if customer is None:
+                raise ValidationAppError("Customer not found in this company", code="MISSING_CUSTOMER")
+            if payload.reference_sales_invoice_id:
+                inv_res = await self.db.execute(
+                    select(SalesInvoice).where(
+                        SalesInvoice.id == payload.reference_sales_invoice_id,
+                        SalesInvoice.company_id == company_id,
+                    )
+                )
+                ref_inv = inv_res.scalar_one_or_none()
+                if ref_inv is None:
+                    raise ValidationAppError(
+                        "Referenced sales invoice not found in this company",
+                        code="INVALID_INVOICE_REFERENCE",
+                    )
+                if ref_inv.customer_id != payload.customer_id:
+                    raise ValidationAppError(
+                        "Credit note customer must match referenced invoice customer",
+                        code="CUSTOMER_MISMATCH",
+                    )
+                if total_note_amount > ref_inv.grand_total:
+                    raise ValidationAppError(
+                        f"Credit note amount ({total_note_amount}) cannot exceed referenced invoice amount ({ref_inv.grand_total})",
+                        code="AMOUNT_EXCEEDS_INVOICE",
+                    )
+        else:
+            vendor = await self.vendors.get_by_id_for_company(payload.vendor_id, company_id)
+            if vendor is None:
+                raise ValidationAppError("Vendor not found in this company", code="MISSING_VENDOR")
+            if payload.reference_purchase_invoice_id:
+                inv_res = await self.db.execute(
+                    select(PurchaseInvoice).where(
+                        PurchaseInvoice.id == payload.reference_purchase_invoice_id,
+                        PurchaseInvoice.company_id == company_id,
+                    )
+                )
+                ref_inv = inv_res.scalar_one_or_none()
+                if ref_inv is None:
+                    raise ValidationAppError(
+                        "Referenced purchase invoice not found in this company",
+                        code="INVALID_INVOICE_REFERENCE",
+                    )
+                if ref_inv.vendor_id != payload.vendor_id:
+                    raise ValidationAppError(
+                        "Credit note vendor must match referenced invoice vendor",
+                        code="VENDOR_MISMATCH",
+                    )
+                if total_note_amount > ref_inv.grand_total:
+                    raise ValidationAppError(
+                        f"Credit note amount ({total_note_amount}) cannot exceed referenced invoice amount ({ref_inv.grand_total})",
+                        code="AMOUNT_EXCEEDS_INVOICE",
+                    )
 
         items = [
             CreditNoteItem(
@@ -96,13 +150,15 @@ class CreditNoteService:
             sgst_amount=totals.sgst_amount,
             igst_amount=totals.igst_amount,
             cess_amount=totals.cess_amount,
-            total_amount=totals.taxable_amount + totals.total_tax,
+            total_amount=total_note_amount,
             status=TransactionStatus.POSTED,
             source=payload.source,
             source_reference=payload.source_reference,
             items=items,
         )
         await self.repo.create(note)
+
+        await self.posting.post_credit_note(company_id, note, current_user, meta)
 
         await self.audit.log(
             action=AuditAction.ACCOUNTING_CREATE,
