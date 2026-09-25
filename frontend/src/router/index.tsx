@@ -13,6 +13,7 @@ import UsersPage from "@/pages/users/UsersPage";
 import DocumentsPage from "@/pages/documents/DocumentsPage";
 import AuditLogsPage from "@/pages/audit-logs/AuditLogsPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
+import ActionCenterPage from "@/pages/action-center/ActionCenterPage";
 import ForbiddenPage from "@/pages/errors/Forbidden";
 import NotFoundPage from "@/pages/errors/NotFound";
 
@@ -87,6 +88,7 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { path: "/dashboard", element: <DashboardPage /> },
+          { path: "/action-center", element: <ActionCenterPage /> },
           { path: "/companies", element: <CompaniesListPage /> },
           { path: "/companies/:companyId", element: <CompanyDetailsPage /> },
           { path: "/users", element: <UsersPage /> },

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   BarChart3,
@@ -27,12 +28,15 @@ import {
   CalendarClock,
   Bell,
   Scale,
+  Search,
+  ShieldAlert,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { cn, initials } from "@/lib/utils";
 import { CompanySwitcher } from "@/components/CompanySwitcher";
 import { NotificationBell } from "@/components/NotificationBell";
+import { GlobalSearchDialog } from "@/components/GlobalSearchDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +48,7 @@ import {
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/action-center", label: "Action Center", icon: ShieldAlert },
   { to: "/companies", label: "Companies", icon: Building2 },
   { to: "/documents", label: "Documents", icon: FileText },
   { to: "/users", label: "Users", icon: Users },
@@ -110,6 +115,18 @@ const COMPLIANCE_NAV_ITEMS = [
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
@@ -287,39 +304,60 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="border-t border-border p-3 text-xs text-muted-foreground">
-          Phase 9 · Compliance Calendar &amp; Task Management
+          Phase 10 · Business Workflow &amp; UX Intelligence
         </div>
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-white px-6">
-          <CompanySwitcher />
+          <div className="flex items-center gap-4">
+            <CompanySwitcher />
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="hidden md:flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Search company records...</span>
+              <kbd className="pointer-events-none inline-flex h-4 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </button>
+          </div>
 
           <div className="flex items-center gap-2">
-          <NotificationBell />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                  {user ? initials(user.first_name, user.last_name) : ""}
-                </span>
-                <span className="hidden sm:inline">{user?.first_name} {user?.last_name}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col">
-                  <span className="font-medium">{user?.first_name} {user?.last_name}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{user?.email}</span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout()} className="text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="flex md:hidden p-2 rounded-md hover:bg-accent text-muted-foreground"
+              title="Search records"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <NotificationBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {user ? initials(user.first_name, user.last_name) : ""}
+                  </span>
+                  <span className="hidden sm:inline">{user?.first_name} {user?.last_name}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{user?.first_name} {user?.last_name}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{user?.email}</span>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => logout()} className="text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -327,6 +365,8 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   );
 }

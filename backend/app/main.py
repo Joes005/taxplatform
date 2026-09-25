@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api import (
     accounting_periods,
+    action_center,
     audit_checklists,
     audit_engagements,
     audit_findings,
@@ -31,7 +32,9 @@ from app.api import (
     compliance_tasks,
     credit_notes,
     customers,
+    dashboard,
     debit_notes,
+    deductees,
     documents,
     financial_years,
     gst_profile,
@@ -66,6 +69,7 @@ from app.api import (
     reports,
     roles,
     sales_invoices,
+    search,
     tds_challans,
     tds_profile,
     tds_reconciliation,
@@ -239,3 +243,7 @@ app.include_router(compliance_tasks.router, prefix=settings.API_V1_PREFIX)
 app.include_router(compliance_calendar.router, prefix=settings.API_V1_PREFIX)
 app.include_router(compliance_reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
+app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
+app.include_router(action_center.router, prefix=settings.API_V1_PREFIX)
+app.include_router(search.router, prefix=settings.API_V1_PREFIX)
+

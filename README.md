@@ -1556,3 +1556,44 @@ plugs into the document lifecycle at the states Phase 2 already reserved for it:
   document truly doesn't exist or simply belongs to another company — deliberately, so a
   valid session can never distinguish "wrong ID" from "someone else's document" and
   enumerate other tenants' data.
+
+---
+
+## 26. Phase 10 — Business Workflow & UX Intelligence
+
+Phase 10 transforms the platform from a collection of isolated compliance modules into a cohesive, actionable, business-driven workflow application.
+
+### 1. Architectural Highlights
+- **Command Center Dashboard (`/dashboard`)**:
+  - Unifies real-time business attention counters, active FY/quarter context, deterministic setup progress, end-to-end workflow pipeline, compliance health matrix, today's actionable tasks, and role-tailored quick action hubs.
+  - Replaces generic/disconnected statistics with real backend-derived operational states.
+- **Action Center (`/action-center`)**:
+  - Central clearinghouse for pending tasks, reconciliation exceptions, missing balances, and compliance deadlines.
+  - Multi-dimensional filtering by Category (Critical, Due Soon, Overdue, Review Required, Reconciliation, Compliance, Tax, Accounting), Severity (Critical, High, Medium, Low, Info), and Module.
+  - Fully URL-synced filters for direct deep-linking from attention cards.
+- **Workflow Lifecycle Pipeline**:
+  - Visual 8-stage pipeline tracking progress across: Data Ingestion → Accounting → GST / TDS → Bank Reconciliation → Income Tax → Audit → Compliance → Reporting.
+  - Real-time pending and blocking counters with direct action navigation.
+- **Deterministic Setup Progress**:
+  - Evaluates 8 essential organization prerequisites (Profile, Financial Year, Chart of Accounts, GST Profile, TDS Profile, Bank Account, Opening Balances, First Import) directly against the database state.
+- **Company Health Matrix**:
+  - Deterministically evaluates 7 operational domains (Accounting, GST, TDS, Bank, Income Tax, Audit, Compliance) into `READY`, `NEEDS_ATTENTION`, `BLOCKED`, or `NOT_CONFIGURED` with domain-specific metrics.
+- **Global Search (`Cmd+K` / `Ctrl+K`)**:
+  - Company-scoped fast query across 11 entity types: Customers, Vendors, Sales Invoices, Purchase Invoices, Receipts, Payments, Ledgers, Documents, Bank Transactions, Audit Findings, and Compliance Obligations.
+  - Strict tenant isolation enforced server-side.
+- **Backend Aggregation Layer**:
+  - `GET /api/v1/dashboard/summary`: Aggregates active period and 6-tier attention counters.
+  - `GET /api/v1/dashboard/actions`: Assembles prioritized action items across all modules.
+  - `GET /api/v1/dashboard/workflow`: Evaluates the 8 lifecycle stages.
+  - `GET /api/v1/dashboard/setup-progress`: Evaluates 8 setup prerequisites.
+  - `GET /api/v1/dashboard/health`: Evaluates the 7 compliance domain health states.
+  - `GET /api/v1/action-center`: Paginated and filtered action center tasks.
+  - `GET /api/v1/search`: High-performance company-scoped global search.
+
+### 2. Constraints & Security
+- **Local & Self-Contained**: 100% free and local architecture. No cloud or paid APIs.
+- **Tenant Isolation**: All aggregation and search endpoints resolve company membership server-side; cross-tenant access returns `403 Forbidden` / `404 Not Found`.
+- **Zero Regressions**: 369/369 tests pass (364 baseline + 5 Phase 10 tests).
+- **Migration Head**: `21f14d138a81` (no schema change required; workflow states are derived directly from existing domain models).
+- **External Integrations**: Live portal integrations remain adapter-ready only.
+
