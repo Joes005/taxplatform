@@ -76,6 +76,7 @@ from app.models.tds_review_note import TDSReviewNote
 from app.models.tds_rule import TDSRule
 from app.models.tds_section import TDSSection
 from app.models.tds_transaction import TDSTransaction
+from app.models.tally_mapping_template import TallyMappingTemplate
 from app.models.tax_computation import TaxComputation, TaxComputationSnapshot
 from app.models.user import User
 from app.models.vendor import Vendor
@@ -163,6 +164,7 @@ __all__ = [
     "Role",
     "SalesInvoice",
     "SalesInvoiceItem",
+    "TallyMappingTemplate",
     "TDSChallan",
     "TDSChallanAllocation",
     "TDSPaymentReconciliation",

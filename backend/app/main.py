@@ -71,6 +71,7 @@ from app.api import (
     roles,
     sales_invoices,
     search,
+    tally,
     tds_challans,
     tds_profile,
     tds_reconciliation,
@@ -196,6 +197,7 @@ app.include_router(receipts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(journal_entries.router, prefix=settings.API_V1_PREFIX)
 app.include_router(opening_balances.router, prefix=settings.API_V1_PREFIX)
 app.include_router(imports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tally.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(gst_profile.router, prefix=settings.API_V1_PREFIX)
 app.include_router(gst_tax_rates.router, prefix=settings.API_V1_PREFIX)

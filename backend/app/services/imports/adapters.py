@@ -88,16 +88,47 @@ class JSONImportAdapter(AccountingImportAdapter):
         return data
 
 
+class TallyXMLImportAdapter(AccountingImportAdapter):
+    """Parses Tally XML exports and flattens vouchers into row dictionaries
+    for the generic column-mapping import pipeline."""
+
+    def parse(self, content: bytes) -> list[dict[str, str]]:
+        from app.services.tally.tally_xml_parser import TallyXMLParser
+
+        parser = TallyXMLParser()
+        batch = parser.parse(content)
+        rows: list[dict[str, str]] = []
+        for v in batch.vouchers:
+            tb = v.tax_breakdown
+            rows.append({
+                "invoice_number": v.voucher_number,
+                "invoice_date": v.voucher_date.isoformat(),
+                "customer_name": v.party_name or "",
+                "party_name": v.party_name or "",
+                "taxable_amount": str(tb.taxable_amount),
+                "cgst_amount": str(tb.cgst_amount),
+                "sgst_amount": str(tb.sgst_amount),
+                "igst_amount": str(tb.igst_amount),
+                "cess_amount": str(tb.cess_amount),
+                "total_amount": str(v.total_amount),
+                "narration": v.narration or "",
+                "voucher_type": v.voucher_type,
+            })
+        return rows
+
+
 class TallyExportAdapter(AccountingImportAdapter):
-    """Tally's "Export -> CSV/Excel" produces an ordinary CSV or XLSX file
-    — there is no live Tally API involved (explicitly out of scope). This
-    adapter just picks the right underlying parser by extension.
+    """Tally's "Export -> XML/CSV/Excel" produces XML, CSV, or XLSX files.
+    This adapter picks the right underlying parser by extension.
     """
 
     def __init__(self, file_extension: str) -> None:
-        self._delegate: AccountingImportAdapter = (
-            ExcelImportAdapter() if file_extension in ("xlsx", "xls") else CSVImportAdapter()
-        )
+        if file_extension == "xml":
+            self._delegate: AccountingImportAdapter = TallyXMLImportAdapter()
+        elif file_extension in ("xlsx", "xls"):
+            self._delegate = ExcelImportAdapter()
+        else:
+            self._delegate = CSVImportAdapter()
 
     def parse(self, content: bytes) -> list[dict[str, str]]:
         return self._delegate.parse(content)
@@ -110,6 +141,8 @@ def get_adapter(file_extension: str, *, is_tally: bool = False) -> AccountingImp
         return ExcelImportAdapter()
     if file_extension == "csv":
         return CSVImportAdapter()
+    if file_extension == "xml":
+        return TallyXMLImportAdapter()
     if file_extension == "json":
         return JSONImportAdapter()
     raise ValidationAppError(

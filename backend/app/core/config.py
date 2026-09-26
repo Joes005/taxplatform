@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # touching the document service, API, or database model.
     DOCUMENT_STORAGE_PATH: str = "./storage"
     MAX_UPLOAD_SIZE_MB: int = 10
-    ALLOWED_DOCUMENT_EXTENSIONS: str = "pdf,jpg,jpeg,png,xlsx,xls,csv,json"
+    ALLOWED_DOCUMENT_EXTENSIONS: str = "pdf,jpg,jpeg,png,xlsx,xls,csv,json,xml"
 
     # --- Notifications / Scheduler (Phase 7 & 8) ---
     COMPLIANCE_SWEEP_ENABLED: bool = True

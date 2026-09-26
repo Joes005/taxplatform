@@ -67,9 +67,11 @@ FILE_TYPE_REGISTRY: dict[str, FileTypeSpec] = {
     "json": FileTypeSpec(
         extension="json",
         allowed_mime_types=frozenset({"application/json", "text/json", "text/plain", ""}),
-        # JSON has no fixed magic bytes; content is checked for being
-        # plausible text, same as CSV — the JSON import adapter itself is
-        # what actually verifies the content parses (PHASE4 GSTR-2B import).
+        magic_bytes=None,
+    ),
+    "xml": FileTypeSpec(
+        extension="xml",
+        allowed_mime_types=frozenset({"application/xml", "text/xml", "text/plain", ""}),
         magic_bytes=None,
     ),
 }

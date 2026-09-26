@@ -32,6 +32,7 @@ import OtherTransactionsPage from "@/pages/accounting/OtherTransactionsPage";
 import ImportsPage from "@/pages/accounting/ImportsPage";
 import ImportWizardPage from "@/pages/accounting/ImportWizardPage";
 import ImportDetailPage from "@/pages/accounting/ImportDetailPage";
+import TallyCenterPage from "@/pages/accounting/TallyCenterPage";
 import ReportsPage from "@/pages/accounting/ReportsPage";
 import AccountingDashboardPage from "@/pages/accounting/AccountingDashboardPage";
 
@@ -118,6 +119,7 @@ export const router = createBrowserRouter([
           { path: "/accounting/imports", element: <ImportsPage /> },
           { path: "/accounting/imports/new", element: <ImportWizardPage /> },
           { path: "/accounting/imports/:jobId", element: <ImportDetailPage /> },
+          { path: "/accounting/tally", element: <TallyCenterPage /> },
           { path: "/accounting/reports", element: <ReportsPage /> },
           { path: "/accounting/dashboard", element: <AccountingDashboardPage /> },
           { path: "/gst", element: <GstDashboardPage /> },

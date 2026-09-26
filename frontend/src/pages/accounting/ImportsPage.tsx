@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Plus, UploadCloud } from "lucide-react";
+import { FileSpreadsheet, Plus, UploadCloud } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useImportJobs } from "@/hooks/useImports";
@@ -37,13 +37,20 @@ export default function ImportsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Imports</h1>
           <p className="text-sm text-muted-foreground">Bring in data from Tally exports, Excel, or CSV files</p>
         </div>
-        <PermissionGate permission="ACCOUNTING_IMPORT">
-          <Button asChild>
-            <Link to="/accounting/imports/new">
-              <Plus className="mr-1.5 h-4 w-4" /> New Import
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/accounting/tally">
+              <FileSpreadsheet className="mr-1.5 h-4 w-4 text-primary" /> Tally Bridge
             </Link>
           </Button>
-        </PermissionGate>
+          <PermissionGate permission="ACCOUNTING_IMPORT">
+            <Button asChild>
+              <Link to="/accounting/imports/new">
+                <Plus className="mr-1.5 h-4 w-4" /> New Import
+              </Link>
+            </Button>
+          </PermissionGate>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-white">

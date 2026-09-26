@@ -44,6 +44,7 @@ class ImportJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         index=True,
     )
     column_mapping: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    reconciliation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     total_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     successful_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

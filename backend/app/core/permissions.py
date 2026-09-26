@@ -82,6 +82,15 @@ class PermissionCode(StrEnum):
     ACCOUNTING_IMPORT_COMMIT = "ACCOUNTING_IMPORT_COMMIT"
     ACCOUNTING_IMPORT_VIEW = "ACCOUNTING_IMPORT_VIEW"
 
+    # --- Tally Compatibility (Phase 12) ---
+    TALLY_IMPORT_VIEW = "TALLY_IMPORT_VIEW"
+    TALLY_IMPORT_CREATE = "TALLY_IMPORT_CREATE"
+    TALLY_IMPORT_COMMIT = "TALLY_IMPORT_COMMIT"
+    TALLY_IMPORT_EXPORT = "TALLY_IMPORT_EXPORT"
+    TALLY_MAPPING_MANAGE = "TALLY_MAPPING_MANAGE"
+    TALLY_EXPORT_VIEW = "TALLY_EXPORT_VIEW"
+    TALLY_EXPORT_CREATE = "TALLY_EXPORT_CREATE"
+
     # --- GST (Phase 4) ---
     GST_VIEW = "GST_VIEW"
     GST_CREATE = "GST_CREATE"
@@ -290,6 +299,13 @@ PERMISSIONS: list[tuple[PermissionCode, str, str]] = [
     (PermissionCode.ACCOUNTING_IMPORT, "ACCOUNTING", "Upload and preview accounting data imports"),
     (PermissionCode.ACCOUNTING_IMPORT_COMMIT, "ACCOUNTING", "Commit accounting data imports"),
     (PermissionCode.ACCOUNTING_IMPORT_VIEW, "ACCOUNTING", "View import jobs and their results"),
+    (PermissionCode.TALLY_IMPORT_VIEW, "TALLY", "View Tally imports and reconciliation"),
+    (PermissionCode.TALLY_IMPORT_CREATE, "TALLY", "Upload and preview Tally imports"),
+    (PermissionCode.TALLY_IMPORT_COMMIT, "TALLY", "Commit Tally data into accounting"),
+    (PermissionCode.TALLY_IMPORT_EXPORT, "TALLY", "Manage Tally import and export pipelines"),
+    (PermissionCode.TALLY_MAPPING_MANAGE, "TALLY", "Create and manage Tally mapping templates"),
+    (PermissionCode.TALLY_EXPORT_VIEW, "TALLY", "View Tally export profiles"),
+    (PermissionCode.TALLY_EXPORT_CREATE, "TALLY", "Generate Tally compatible export files"),
     (PermissionCode.GST_VIEW, "GST", "View GST profile and tax configuration"),
     (PermissionCode.GST_CREATE, "GST", "Create GST profile and tax configuration"),
     (PermissionCode.GST_UPDATE, "GST", "Update GST profile and tax configuration"),
@@ -458,6 +474,13 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.ACCOUNTING_IMPORT,
         PermissionCode.ACCOUNTING_IMPORT_COMMIT,
         PermissionCode.ACCOUNTING_IMPORT_VIEW,
+        PermissionCode.TALLY_IMPORT_VIEW,
+        PermissionCode.TALLY_IMPORT_CREATE,
+        PermissionCode.TALLY_IMPORT_COMMIT,
+        PermissionCode.TALLY_IMPORT_EXPORT,
+        PermissionCode.TALLY_MAPPING_MANAGE,
+        PermissionCode.TALLY_EXPORT_VIEW,
+        PermissionCode.TALLY_EXPORT_CREATE,
         PermissionCode.GST_VIEW,
         PermissionCode.GST_CREATE,
         PermissionCode.GST_UPDATE,
@@ -592,6 +615,13 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.ACCOUNTING_IMPORT,
         PermissionCode.ACCOUNTING_IMPORT_COMMIT,
         PermissionCode.ACCOUNTING_IMPORT_VIEW,
+        PermissionCode.TALLY_IMPORT_VIEW,
+        PermissionCode.TALLY_IMPORT_CREATE,
+        PermissionCode.TALLY_IMPORT_COMMIT,
+        PermissionCode.TALLY_IMPORT_EXPORT,
+        PermissionCode.TALLY_MAPPING_MANAGE,
+        PermissionCode.TALLY_EXPORT_VIEW,
+        PermissionCode.TALLY_EXPORT_CREATE,
         PermissionCode.GST_VIEW,
         PermissionCode.GST_CREATE,
         PermissionCode.GST_UPDATE,
@@ -687,6 +717,8 @@ ROLE_PERMISSIONS: dict[RoleCode, list[PermissionCode]] = {
         PermissionCode.RECEIPT_VIEW,
         PermissionCode.JOURNAL_VIEW,
         PermissionCode.ACCOUNTING_IMPORT_VIEW,
+        PermissionCode.TALLY_IMPORT_VIEW,
+        PermissionCode.TALLY_EXPORT_VIEW,
         PermissionCode.GST_VIEW,
         PermissionCode.GST_RETURN_VIEW,
         PermissionCode.GST_RETURN_APPROVE,

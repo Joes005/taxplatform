@@ -11,6 +11,7 @@
 **Phase 9 — Compliance Calendar & Task Management (Obligations, Tasks, Notifications)**
 **Phase 10 — Business Workflow & UX Intelligence (Dashboard, Action Center, Pipeline, Global Search)**
 **Phase 11 — Reports & Business Intelligence (Report Center, Financial, Tax, Banking, Audit, Management BI)**
+**Phase 12 — Tally Data Compatibility & Import/Export Intelligence (XML/CSV/XLSX Ingestion, Mapping, Deduplication, Reconciliation, Export)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -1659,5 +1660,70 @@ Phase 11 transforms raw transactional and compliance data across all modules int
 - **Frontend Quality**: TypeScript passed with zero errors; ESLint clean; Vite production bundle built successfully.
 - **Migration Head**: `21f14d138a81` (no schema change; all reports derived cleanly from existing domain models).
 - **Tenant Isolation**: Cross-tenant direct API requests return `403 Forbidden`.
+
+---
+
+## 28. Phase 12 — Tally Data Compatibility & Import/Export Intelligence
+
+Phase 12 delivers a complete, production-grade **Tally Data Compatibility & Import/Export Intelligence** layer on top of the existing double-entry accounting engine.
+
+It establishes a reliable bridge between Tally Prime / Tally ERP 9 and TALLY TAX through local export file ingestion, intelligent parsing, multi-pass mapping, validation, deterministic duplicate detection, atomic commit, automated reconciliation, and Tally-compliant export generation.
+
+### 1. Architectural Highlights
+- **End-to-End Pipeline**:
+  `Tally Export (XML/CSV/XLSX) → Ingestion & Detection → Secure Parsing → Canonical Normalization → Mapping Engine & Templates → Validation & Deduplication → Interactive Preview → Atomic Commit → Post-Commit Reconciliation Scorecard → Export Studio`
+- **Multi-Format Ingestion & Signature Detection (`TallyDetector`)**:
+  - Automatically identifies `TALLY_XML` (Envelope/Vouchers), tabular `CSV`, and multi-sheet `XLSX` files.
+  - Safe inspection of headers, encoding (`utf-8`, `utf-16`, `iso-8859-1`, `windows-1252`), file size limits (up to 50MB), and embedded Tally company names.
+- **Secure XML & Tabular Parsers**:
+  - **`TallyXMLParser`**: Uses `defusedxml` to protect against XML entity expansion (Billion Laughs bomb), external entity injections (XXE), and recursive DTDs. Parses vouchers (`Sales`, `Purchase`, `Payment`, `Receipt`, `Journal`), ledgers, parties, inventory lines, tax breakdowns (`CGST`, `SGST`, `IGST`, `Cess`), and company metadata.
+  - **`TallyTabularParser`**: Parses Tally Daybook CSV and register Excel workbooks with flexible column matching, dates (`YYYYMMDD`, `DD-MM-YYYY`, `DD/MM/YYYY`), and debit/credit sign conventions.
+- **Ledger & Party Mapping Engine (`TallyMapper`)**:
+  - Resolves source Tally ledger/party names against the target Chart of Accounts.
+  - Multi-pass resolution: Exact match (100% confidence) → Alias / normalization match → Saved template rule match → Intelligent heuristic proposal.
+  - Saved Mapping Templates (`TallyMappingTemplate`): Reusable mapping profiles stored per company, versioned, and auto-applied to future imports.
+- **Comprehensive Validation & Deterministic Duplicate Detection (`TallyValidator`)**:
+  - **Double-Entry Balance Verification**: Ensures Total Debits == Total Credits across voucher lines. Unbalanced journals are flagged with warnings or rejected.
+  - **Period Lock Protection**: Blocks vouchers falling into closed or locked accounting periods.
+  - **Statutory Tax Rate Mismatches**: Computes expected GST vs voucher tax breakdown and raises `IMPORT_TAX_MISMATCH` warnings if discrepancies exist.
+  - **Deterministic Duplicate Fingerprinting**: Generates SHA256 fingerprints `(date + type + number + party + amount)` and checks against existing vouchers/invoices to prevent duplicate imports.
+- **Transactional Atomic Commit (`TallyImporter`)**:
+  - Commits valid, non-duplicate vouchers directly into core domain models (`SalesInvoice`, `PurchaseInvoice`, `Payment`, `Receipt`, `JournalEntry`, `OpeningBalance`).
+  - Sets `source = DataSource.TALLY` and tags `source_reference` with voucher numbers and fingerprints for complete auditability.
+  - Automatically ensures active Financial Years exist for imported voucher date ranges.
+  - Zero partial writes: commits within database transaction with rollback safety.
+- **Automated Post-Commit Reconciliation Audit Report**:
+  - Compares source Tally record counts & amounts against successfully committed accounting records across 6 categories (Sales, Purchases, Receipts, Payments, Journals, Opening Balances).
+  - Calculates differences and assigns audit status (`MATCHED` vs `DISCREPANCY`).
+  - Persisted into `import_jobs.reconciliation` JSON column and accessible via `/api/v1/tally/reconciliation/{job_id}`.
+- **Tally Export Studio (`TallyExporter`)**:
+  - **Tally XML**: Generates compliant `<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><DATA>` envelopes for import into Tally Prime / ERP 9.
+  - **Daybook CSV**: Standard Daybook export compatible with Tally tabular import utilities.
+  - **Multi-Sheet Excel**: Formatted workbook containing Daybook sheet and Chart of Accounts sheet.
+  - **Export Profile Filtering**: Date ranges, Financial Year, and voucher type selectors with live scope preview scorecard before downloading.
+- **Dedicated Frontend Tally Bridge (`/accounting/tally`)**:
+  - Interactive tabs: **Import & Reconcile**, **Export Studio**, and **Mapping Templates**.
+  - Dropzone with live file signature and encoding badge.
+  - Interactive ledger override dropdowns with match confidence scores.
+  - Duplicate detection alerts and parsed vouchers preview table.
+  - One-click commit with template saving and post-import reconciliation scorecard.
+
+### 2. Backend Endpoints
+- `POST /api/v1/tally/detect?company_id={company_id}`: Inspect and detect Tally export format.
+- `POST /api/v1/tally/preview?company_id={company_id}`: Parse, map, validate, and preview vouchers with duplicate detection.
+- `POST /api/v1/tally/commit?company_id={company_id}`: Atomically commit valid vouchers to accounting and save template.
+- `GET /api/v1/tally/reconciliation/{job_id}?company_id={company_id}`: Retrieve post-import reconciliation audit scorecard.
+- `GET /api/v1/tally/templates?company_id={company_id}`: List saved mapping templates.
+- `POST /api/v1/tally/templates?company_id={company_id}`: Create custom mapping template.
+- `DELETE /api/v1/tally/templates/{template_id}?company_id={company_id}`: Delete mapping template.
+- `POST /api/v1/tally/export/preview?company_id={company_id}`: Preview export scope and voucher count breakdown.
+- `POST /api/v1/tally/export?company_id={company_id}`: Generate and download Tally XML, CSV, or Excel file.
+
+### 3. Verification & Quality Gates
+- **Total Backend Tests**: 391 / 391 PASS (377 baseline + 14 Phase 12 integration tests, 0 failures, 0 regressions).
+- **Frontend Quality**: TypeScript build passed with zero errors (`tsc -b && vite build`); ESLint passed with 0 errors.
+- **Migration Head**: `b1e2c3d4e5f6` (`tally_mapping_templates` table and `import_jobs.reconciliation` column).
+- **Security & RBAC**: defusedxml XXE protection verified; auditor role blocked from committing imports; cross-tenant direct API requests return `403 Forbidden`.
+
 
 

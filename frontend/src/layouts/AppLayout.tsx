@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarRange,
   ClipboardCheck,
+  FileSpreadsheet,
   FileText,
   Gauge,
   LayoutDashboard,
@@ -69,6 +70,7 @@ const ACCOUNTING_NAV_ITEMS = [
   { to: "/accounting/purchase-invoices", label: "Purchase Invoices", icon: ShoppingCart },
   { to: "/accounting/transactions", label: "Payments & Journals", icon: Wallet },
   { to: "/accounting/imports", label: "Imports", icon: UploadCloud },
+  { to: "/accounting/tally", label: "Tally Bridge", icon: FileSpreadsheet },
   { to: "/accounting/reports", label: "Reports", icon: BarChart3 },
 ];
 
