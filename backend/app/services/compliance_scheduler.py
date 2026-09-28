@@ -7,13 +7,14 @@ from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
 from app.models.company import Company
+from app.services.compliance_obligation_service import ComplianceObligationService
 from app.services.compliance_task_service import ComplianceTaskService
 
 logger = logging.getLogger("compliance.scheduler")
 
 
 async def sweep_all_companies_overdue() -> dict[str, int]:
-    """Sweeps overdue compliance tasks for all active companies in a fresh session."""
+    """Sweeps overdue compliance tasks and obligations for all active companies in a fresh session."""
     results: dict[str, int] = {}
     async with AsyncSessionLocal() as session:
         try:
@@ -22,13 +23,16 @@ async def sweep_all_companies_overdue() -> dict[str, int]:
             company_ids = [row[0] for row in res.all()]
 
             task_service = ComplianceTaskService(session)
+            ob_service = ComplianceObligationService(session)
             for cid in company_ids:
                 try:
-                    swept = await task_service.sweep_overdue(cid, current_user=None)
-                    if swept > 0:
-                        results[str(cid)] = swept
+                    swept_tasks = await task_service.sweep_overdue(cid, current_user=None)
+                    swept_obs = await ob_service.sweep_overdue(cid, current_user=None)
+                    total_swept = swept_tasks + swept_obs
+                    if total_swept > 0:
+                        results[str(cid)] = total_swept
                 except Exception as ex:
-                    logger.warning("Error sweeping overdue tasks for company %s: %s", cid, ex)
+                    logger.warning("Error sweeping overdue compliance for company %s: %s", cid, ex)
             await session.commit()
         except Exception:
             await session.rollback()

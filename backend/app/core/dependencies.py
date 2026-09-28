@@ -105,3 +105,25 @@ def require_permission(permission_code: str):
         return membership
 
     return dependency
+
+
+def require_any_permission(*permission_codes: str):
+    """Dependency factory enforcing at least one of the permissions within the {company_id} path scope."""
+
+    async def dependency(
+        current_user: User = Depends(get_current_user),
+        membership: CompanyMembership | None = Depends(get_current_membership),
+        db: AsyncSession = Depends(get_db),
+    ) -> CompanyMembership | None:
+        if current_user.is_platform_super_admin:
+            return membership
+
+        assert membership is not None
+        codes = await RoleRepository(db).get_permission_codes_for_role(membership.role_id)
+        if not any(code in codes for code in permission_codes):
+            raise PermissionDeniedError(
+                f"You do not have permission to perform this action ({', '.join(permission_codes)})"
+            )
+        return membership
+
+    return dependency

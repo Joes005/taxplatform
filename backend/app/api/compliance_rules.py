@@ -133,8 +133,9 @@ async def generate_obligations(
         current_user=current_user,
         meta=meta,
     )
+    data = ComplianceObligationRead.model_validate(obligation)
     await db.commit()
     return SuccessResponse(
-        data=ComplianceObligationRead.model_validate(obligation),
+        data=data,
         message="Obligation generated from rule",
     )

@@ -1,10 +1,10 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.compliance_enums import ComplianceCategory, ComplianceModule
+from app.models.compliance_enums import ComplianceCategory, ComplianceModule, ComplianceObligationStatus
 from app.models.compliance_obligation import ComplianceObligation
 
 
@@ -15,6 +15,7 @@ class ComplianceObligationRepository:
     async def create(self, obligation: ComplianceObligation) -> ComplianceObligation:
         self.db.add(obligation)
         await self.db.flush()
+        await self.db.refresh(obligation)
         return obligation
 
     async def get_by_id_for_company(
@@ -46,6 +47,11 @@ class ComplianceObligationRepository:
         *,
         category: ComplianceCategory | None = None,
         module: ComplianceModule | None = None,
+        status: ComplianceObligationStatus | None = None,
+        readiness_status: str | None = None,
+        assigned_to: uuid.UUID | None = None,
+        search: str | None = None,
+        overdue_only: bool = False,
         active_only: bool = True,
         offset: int = 0,
         limit: int = 20,
@@ -55,6 +61,31 @@ class ComplianceObligationRepository:
             query = query.where(ComplianceObligation.category == category)
         if module is not None:
             query = query.where(ComplianceObligation.module == module)
+        if status is not None:
+            query = query.where(ComplianceObligation.status == status)
+        if readiness_status is not None:
+            query = query.where(ComplianceObligation.readiness_status == readiness_status)
+        if assigned_to is not None:
+            query = query.where(ComplianceObligation.assigned_to == assigned_to)
+        if search:
+            s = f"%{search.strip()}%"
+            query = query.where(
+                or_(
+                    ComplianceObligation.code.ilike(s),
+                    ComplianceObligation.name.ilike(s),
+                    ComplianceObligation.description.ilike(s),
+                )
+            )
+        if overdue_only:
+            today = date.today()
+            query = query.where(
+                ComplianceObligation.due_date < today,
+                ComplianceObligation.status.notin_([
+                    ComplianceObligationStatus.COMPLETED,
+                    ComplianceObligationStatus.FULFILLED,
+                    ComplianceObligationStatus.CANCELLED,
+                ]),
+            )
         if active_only:
             query = query.where(ComplianceObligation.active.is_(True))
 
@@ -74,6 +105,25 @@ class ComplianceObligationRepository:
                 ComplianceObligation.active.is_(True),
                 ComplianceObligation.due_date >= start,
                 ComplianceObligation.due_date <= end,
+            ).order_by(ComplianceObligation.due_date.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_open_past_due(
+        self, company_id: uuid.UUID, *, as_of: date
+    ) -> list[ComplianceObligation]:
+        closed_statuses = [
+            ComplianceObligationStatus.COMPLETED,
+            ComplianceObligationStatus.FULFILLED,
+            ComplianceObligationStatus.CANCELLED,
+        ]
+        result = await self.db.execute(
+            select(ComplianceObligation).where(
+                ComplianceObligation.company_id == company_id,
+                ComplianceObligation.active.is_(True),
+                ComplianceObligation.due_date < as_of,
+                ComplianceObligation.status.notin_(closed_statuses),
             )
         )
         return list(result.scalars().all())
+

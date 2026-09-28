@@ -33,7 +33,7 @@ class Notification(UUIDPrimaryKeyMixin, Base):
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     type: Mapped[NotificationType] = mapped_column(
-        Enum(NotificationType, native_enum=False, length=25), nullable=False, index=True
+        Enum(NotificationType, native_enum=False, length=30), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)

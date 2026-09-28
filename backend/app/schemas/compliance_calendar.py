@@ -6,16 +6,17 @@ from pydantic import BaseModel
 from app.models.compliance_enums import (
     ComplianceCategory,
     CompliancePriority,
-    ComplianceTaskStatus,
 )
 
 
 class CalendarItem(BaseModel):
-    task_id: uuid.UUID
+    task_id: uuid.UUID | None = None
+    obligation_id: uuid.UUID | None = None
+    item_type: str = "TASK"  # "TASK" or "OBLIGATION"
     title: str
     category: ComplianceCategory
     priority: CompliancePriority
-    status: ComplianceTaskStatus
+    status: str
     is_overdue: bool
 
 

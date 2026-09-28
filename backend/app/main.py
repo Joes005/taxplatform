@@ -82,7 +82,6 @@ from app.api import (
     tds_rules,
     tds_sections,
     tds_transactions,
-    deductees,
     users,
     vendors,
     audit_logs,

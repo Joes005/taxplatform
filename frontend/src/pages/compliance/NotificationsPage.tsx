@@ -44,7 +44,9 @@ export default function NotificationsPage() {
               <div key={n.id} className={`flex items-start justify-between gap-3 p-4 ${n.is_read ? "" : "bg-primary/5"}`}>
                 <div className="flex-1">
                   <div className="mb-1 flex items-center gap-2">
-                    <Badge variant={SEVERITY_VARIANT[n.severity]}>{n.type.replaceAll("_", " ")}</Badge>
+                    <Badge variant={SEVERITY_VARIANT[n.severity as NotificationSeverity] ?? "secondary"}>
+                      {n.type.replaceAll("_", " ")}
+                    </Badge>
                     <span className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</span>
                   </div>
                   <p className="text-sm font-medium">{n.title}</p>
@@ -52,6 +54,11 @@ export default function NotificationsPage() {
                   {n.entity_type === "compliance_task" && n.entity_id && (
                     <Link to={`/compliance/tasks/${n.entity_id}`} className="text-xs font-medium text-primary hover:underline">
                       Open task
+                    </Link>
+                  )}
+                  {n.entity_type === "compliance_obligation" && (
+                    <Link to="/compliance" className="text-xs font-medium text-primary hover:underline">
+                      Open in Compliance Control Center
                     </Link>
                   )}
                 </div>

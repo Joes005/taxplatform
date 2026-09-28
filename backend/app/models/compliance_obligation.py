@@ -1,7 +1,7 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -18,11 +18,11 @@ from app.utils.types import GUID
 
 class ComplianceObligation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """One company's instance of a compliance requirement for one period
-    (PHASE9 §5) — either generated from an active `ComplianceRule`
+    (PHASE9 §5, PHASE13 §4) — either generated from an active `ComplianceRule`
     (`rule_id`/`rule_version` set) or created manually (both null).
-    `ComplianceTask` rows are what get worked on; an obligation is the
-    "this is due" record a task traces back to via `source_type=MANUAL`-
-    style `ComplianceTask.obligation_id`.
+    Phase 13 establishes the full lifecycle:
+    OBLIGATION -> SCHEDULE -> DUE DATE -> PREREQUISITES -> READINESS CHECK
+    -> TASK -> EVIDENCE -> REVIEW -> APPROVAL / COMPLETION -> AUDIT TRAIL.
     """
 
     __tablename__ = "compliance_obligations"
@@ -35,6 +35,7 @@ class ComplianceObligation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "tax_period",
             unique=True,
         ),
+        Index("ix_compliance_obligations_assigned", "company_id", "assigned_to"),
     )
 
     company_id: Mapped[str] = mapped_column(
@@ -63,7 +64,7 @@ class ComplianceObligation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(CompliancePriority, native_enum=False, length=10), default=CompliancePriority.MEDIUM, nullable=False
     )
     status: Mapped[ComplianceObligationStatus] = mapped_column(
-        Enum(ComplianceObligationStatus, native_enum=False, length=15),
+        Enum(ComplianceObligationStatus, native_enum=False, length=25),
         default=ComplianceObligationStatus.ACTIVE,
         nullable=False,
         index=True,
@@ -75,6 +76,18 @@ class ComplianceObligation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     rule_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    assigned_to: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    readiness_status: Mapped[str] = mapped_column(String(25), default="NOT_APPLICABLE", nullable=False)
+    readiness_details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prerequisite_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )

@@ -193,3 +193,29 @@ class NotificationService:
 
     async def mark_all_read(self, company_id: uuid.UUID, user_id: uuid.UUID) -> None:
         await self.repo.mark_all_read(company_id, user_id)
+
+    async def create(
+        self,
+        *,
+        company_id: uuid.UUID,
+        user_id: uuid.UUID,
+        type: NotificationType,
+        title: str,
+        message: str,
+        severity: NotificationSeverity = NotificationSeverity.INFO,
+        entity_type: str | None = None,
+        entity_id: uuid.UUID | None = None,
+        dedupe: bool = False,
+    ) -> Notification | None:
+        return await self.notify(
+            company_id=company_id,
+            user_id=user_id,
+            notification_type=type,
+            title=title,
+            message=message,
+            severity=severity,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            dedupe=dedupe,
+        )
+

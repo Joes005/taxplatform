@@ -21,7 +21,10 @@ from app.models.bank_enums import (
 from app.models.bank_reconciliation import BankReconciliation
 from app.models.bank_transaction import BankTransaction
 from app.models.company import Company
-from app.models.compliance_enums import ComplianceTaskStatus
+from app.models.compliance_enums import (
+    ComplianceObligationStatus,
+    ComplianceTaskStatus,
+)
 from app.models.compliance_obligation import ComplianceObligation
 from app.models.compliance_task import ComplianceTask
 from app.models.document import Document
@@ -481,6 +484,41 @@ class DashboardService:
                     target_url=f"/compliance/tasks/{task.id}",
                     responsible_roles=["COMPANY_ADMIN", "ACCOUNTANT"],
                     source_reference=f"compliance_task:{task.id}",
+                )
+            )
+
+        # 8. Compliance Obligations (Overdue, Blocked, Under Review)
+        obs_res = await self.db.execute(
+            select(ComplianceObligation)
+            .where(
+                ComplianceObligation.company_id == company_id,
+                ComplianceObligation.active.is_(True),
+                ComplianceObligation.status.in_([
+                    ComplianceObligationStatus.OVERDUE,
+                    ComplianceObligationStatus.BLOCKED,
+                    ComplianceObligationStatus.UNDER_REVIEW,
+                    ComplianceObligationStatus.READY_FOR_REVIEW,
+                ]),
+            )
+            .order_by(ComplianceObligation.due_date.asc())
+            .limit(6)
+        )
+        for ob in obs_res.scalars().all():
+            is_ob_overdue = ob.status == ComplianceObligationStatus.OVERDUE or (ob.due_date and ob.due_date < today)
+            sev = "CRITICAL" if (is_ob_overdue or ob.status == ComplianceObligationStatus.BLOCKED) else "HIGH"
+            items.append(
+                DashboardActionItem(
+                    id=f"compliance-obligation-{ob.id}",
+                    title=f"{'Overdue: ' if is_ob_overdue else ('Blocked: ' if ob.status == ComplianceObligationStatus.BLOCKED else '')}{ob.name}",
+                    description=ob.description or f"Obligation {ob.code} due {ob.due_date}",
+                    module="COMPLIANCE",
+                    severity=sev,
+                    category="COMPLIANCE",
+                    due_date=str(ob.due_date) if ob.due_date else None,
+                    status=str(ob.status),
+                    target_url=f"/compliance?obligationId={ob.id}",
+                    responsible_roles=["COMPANY_ADMIN", "ACCOUNTANT", "AUDITOR"],
+                    source_reference=f"compliance_obligation:{ob.id}",
                 )
             )
 

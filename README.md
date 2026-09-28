@@ -12,6 +12,7 @@
 **Phase 10 — Business Workflow & UX Intelligence (Dashboard, Action Center, Pipeline, Global Search)**
 **Phase 11 — Reports & Business Intelligence (Report Center, Financial, Tax, Banking, Audit, Management BI)**
 **Phase 12 — Tally Data Compatibility & Import/Export Intelligence (XML/CSV/XLSX Ingestion, Mapping, Deduplication, Reconciliation, Export)**
+**Phase 13 — Advanced Compliance & Compliance Control Center (Obligation Lifecycle, Cross-Module Readiness Engine, Due Date Engine, Health Scoring, Evidence, Review & Approval)**
 
 A production-oriented, multi-tenant SaaS foundation for a Tax Compliance & Audit Support
 Platform for Indian businesses. Phase 1 delivers authentication, role-based access control,
@@ -1724,6 +1725,105 @@ It establishes a reliable bridge between Tally Prime / Tally ERP 9 and TALLY TAX
 - **Frontend Quality**: TypeScript build passed with zero errors (`tsc -b && vite build`); ESLint passed with 0 errors.
 - **Migration Head**: `b1e2c3d4e5f6` (`tally_mapping_templates` table and `import_jobs.reconciliation` column).
 - **Security & RBAC**: defusedxml XXE protection verified; auditor role blocked from committing imports; cross-tenant direct API requests return `403 Forbidden`.
+
+---
+
+## 15. Phase 13 — Advanced Compliance & Compliance Control Center
+
+### 1. Overview & Architectural Transformation
+Phase 13 transforms compliance from an isolated tracking list into a **central business workflow coordinator** orchestrating Accounting, GST, TDS, Bank Reconciliation, Income Tax, and Audit modules.
+
+The central lifecycle is strictly enforced:
+```
+OBLIGATION
+→ SCHEDULE
+→ DUE DATE
+→ PREREQUISITES
+→ READINESS CHECK
+→ TASK
+→ EVIDENCE
+→ REVIEW
+→ APPROVAL / COMPLETION
+→ AUDIT TRAIL
+```
+
+### 2. Core Capabilities Implemented
+- **Centralized Compliance Control Center (`/compliance`)**:
+  - Unified workspace displaying Summary Metrics (Total, Due Soon, Overdue, Blocked, Awaiting Review, Completed).
+  - Deterministic Company Compliance Health Scorecard (`HEALTHY`, `ATTENTION_REQUIRED`, `AT_RISK`, `OVERDUE`) with itemized contributing reasons (no black-box AI scores).
+  - Interactive Filter Tabs: All, Due Soon, Overdue, Blocked, Awaiting Review, Completed.
+  - Quick Actions: Manual Obligation Generator, Overdue Sweep Trigger, and Full CSV/XLSX Export Reports.
+- **Cross-Module Readiness Engine (`ComplianceReadinessService`)**:
+  - Automatically queries active repositories across all 6 core domains without duplicating business logic:
+    - **GST**: Verifies GST profile, valid GSTIN, posted vs draft sales invoices, and GSTR-2B import for GSTR-3B ITC reconciliation.
+    - **TDS**: Validates TAN profile configuration, unallocated TDS deductions, and return period status.
+    - **Income Tax**: Checks PAN profile, accounting period closure, and tax computation readiness.
+    - **Audit**: Verifies open engagement status and flags unresolved CRITICAL/HIGH audit findings.
+    - **Bank Reconciliation**: Verifies bank accounts, statement imports, and unreconciled transaction count.
+    - **Accounting**: Verifies active Financial Year, unposted draft journals/invoices, and period lock status.
+  - Returns machine-readable results: `READY`, `READY_WITH_WARNINGS`, `BLOCKED`, `MISSING_DATA` with remediation deep links.
+- **Deterministic Due Date Engine (`compliance_deadline_service`)**:
+  - Rule-based calculation supporting:
+    - `DAYS_AFTER_MONTH_END`: e.g. GSTR-1 on the 11th, GSTR-3B on the 20th. Clamps to valid calendar days (e.g. Feb 28/29).
+    - `QUARTER_BASED_OFFSET`: e.g. TDS quarterly return on 31st of the month following quarter close.
+    - `FIXED_DATE_ANNUAL`: e.g. Corporate ITR filing on October 31st.
+  - Reproducible and auditable: historical dates are never recalculated destructively.
+- **Evidence Management (`compliance_obligation_evidence`)**:
+  - Integrates directly with the Phase 2 Document Store (`DocumentRepository`).
+  - Supports attaching existing uploaded documents (receipts, challans, working papers) with descriptions, uploaded-by metadata, and tenant isolation guarantees.
+- **Review & Approval State Machine**:
+  - Statuses: `DRAFT`, `ASSIGNED`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `UNDER_REVIEW`, `APPROVED`, `COMPLETED`, `FULFILLED`, `REJECTED`, `BLOCKED`, `OVERDUE`, `CANCELLED`, `REOPENED`.
+  - State guards prevent completing or submitting an obligation while blocking prerequisites remain unresolved.
+  - Completed obligations can only be altered by explicitly reopening them with a documented audit reason.
+- **Deterministic Compliance Health Service (`ComplianceHealthService`)**:
+  - Computes company health using transparent scoring rules (100 base score with explicit penalty weights for overdue items, blocked prerequisites, critical audit findings, unreconciled bank transactions, and unallocated TDS).
+- **Compliance Reporting & Action Center Integration**:
+  - Added CSV and XLSX export endpoints for obligations and readiness results.
+  - Integrated with Phase 10 Action Center (`GET /api/v1/action-center`) and Dashboard attention items.
+- **In-App Notification & Escalation Engine**:
+  - Generates notifications for obligation assignment, review requests, returns for changes, approvals, completions, and overdue escalations.
+
+### 3. Backend Endpoints
+- `GET /api/v1/compliance/control-center?company_id={company_id}`: Control center KPI summary and health score.
+- `GET /api/v1/compliance/health?company_id={company_id}`: Detailed deterministic health status, score, reasons, and dimension metrics.
+- `GET /api/v1/compliance/obligations?company_id={company_id}`: List filtered obligations (category, module, status, readiness, overdue_only).
+- `POST /api/v1/compliance/obligations?company_id={company_id}`: Create manual obligation.
+- `GET /api/v1/compliance/obligations/{id}?company_id={company_id}`: Get single obligation details.
+- `PATCH /api/v1/compliance/obligations/{id}?company_id={company_id}`: Update obligation fields.
+- `POST /api/v1/compliance/obligations/{id}/assign?company_id={company_id}`: Assign owner and reviewer.
+- `POST /api/v1/compliance/obligations/{id}/readiness?company_id={company_id}`: Run live cross-module prerequisite check.
+- `POST /api/v1/compliance/obligations/{id}/submit-review?company_id={company_id}`: Submit for review (blocked if prerequisites fail).
+- `POST /api/v1/compliance/obligations/{id}/approve?company_id={company_id}`: Auditor/Admin approval.
+- `POST /api/v1/compliance/obligations/{id}/reject?company_id={company_id}`: Return for changes with notes.
+- `POST /api/v1/compliance/obligations/{id}/complete?company_id={company_id}`: Complete obligation (blocked if prerequisites fail).
+- `POST /api/v1/compliance/obligations/{id}/reopen?company_id={company_id}`: Reopen with audit reason.
+- `POST /api/v1/compliance/obligations/{id}/evidence?company_id={company_id}`: Attach Phase 2 document as compliance evidence.
+- `GET /api/v1/compliance/obligations/{id}/evidence?company_id={company_id}`: List attached evidence.
+- `DELETE /api/v1/compliance/obligations/{id}/evidence/{evidence_id}?company_id={company_id}`: Remove evidence.
+- `POST /api/v1/compliance/obligations/sweep-overdue?company_id={company_id}`: Run synchronous overdue evaluation sweep.
+- `GET /api/v1/compliance/reports/obligations/export?company_id={company_id}&format=csv|xlsx`: Export compliance obligations report.
+- `GET /api/v1/compliance/reports/readiness/export?company_id={company_id}&format=csv|xlsx`: Export readiness evaluation report.
+
+### 4. Database Changes
+- **Migration Head**: `c2d3e4f5a6b7` (`phase13_compliance_control_center`).
+- **Table Added**: `compliance_obligation_evidence` with foreign keys to `compliance_obligations` and `documents`, tenant isolation index on `(company_id, obligation_id)`.
+- **Columns Added to `compliance_obligations`**:
+  - `assigned_to` (`UUID`, FK to `users.id`)
+  - `reviewer_id` (`UUID`, FK to `users.id`)
+  - `readiness_status` (`VARCHAR(30)`)
+  - `readiness_details` (`JSONB / JSON`)
+  - `completed_at` (`TIMESTAMP WITH TIME ZONE`)
+  - `approved_at` (`TIMESTAMP WITH TIME ZONE`)
+  - `review_notes` (`TEXT`)
+  - `prerequisite_config` (`JSONB / JSON`)
+
+### 5. Verification & Quality Gates
+- **Total Backend Tests**: **401 / 401 PASS** (391 baseline + 10 Phase 13 integration tests, 0 failures, 0 regressions).
+- **Frontend Quality**:
+  - `tsc -b && vite build` PASSED with 0 errors.
+  - `eslint .` PASSED with 0 errors.
+- **Multi-Tenant Security**: Verified that Company B users cannot read or modify Company A obligations, attach evidence, or access reports.
+- **Zero Paid / Cloud Dependencies**: No government APIs, no live filing, no OCR/LLM tax calculations, fully local and offline-first.
 
 
 

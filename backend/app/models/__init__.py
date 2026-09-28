@@ -16,6 +16,7 @@ from app.models.bank_transaction import BankTransaction
 from app.models.bank_transaction_match import BankTransactionMatch
 from app.models.company import Company
 from app.models.compliance_obligation import ComplianceObligation
+from app.models.compliance_obligation_evidence import ComplianceObligationEvidence
 from app.models.compliance_rule import ComplianceRule
 from app.models.compliance_task import ComplianceTask, ComplianceTaskComment, ComplianceTaskEvidence
 from app.models.credit_note import CreditNote, CreditNoteItem
@@ -101,6 +102,7 @@ __all__ = [
     "BankTransactionMatch",
     "Company",
     "ComplianceObligation",
+    "ComplianceObligationEvidence",
     "ComplianceRule",
     "ComplianceTask",
     "ComplianceTaskComment",

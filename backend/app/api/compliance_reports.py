@@ -8,7 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, get_request_meta, require_permission
 from app.core.permissions import PermissionCode
-from app.models.compliance_enums import ComplianceCategory, ComplianceModule, CompliancePriority, ComplianceTaskStatus
+from app.models.compliance_enums import (
+    ComplianceCategory,
+    ComplianceModule,
+    ComplianceObligationStatus,
+    CompliancePriority,
+    ComplianceTaskStatus,
+)
 from app.models.user import User
 from app.services.audit_service import AuditAction, AuditService
 from app.services.auth_service import RequestMeta
@@ -44,6 +50,74 @@ async def export_tasks(
         resource_type="compliance_export",
         resource_id=file.filename,
         description=f"Compliance task report exported as {file.filename}",
+        ip_address=meta.ip_address,
+        user_agent=meta.user_agent,
+    )
+    await db.commit()
+
+    return Response(
+        content=file.content,
+        media_type=file.media_type,
+        headers={"Content-Disposition": safe_content_disposition(file.filename)},
+    )
+
+
+@router.get("/obligations/export")
+async def export_obligations(
+    company_id: uuid.UUID,
+    format: Literal["csv", "xlsx"] = Query(default="csv"),
+    status: ComplianceObligationStatus | None = Query(default=None),
+    category: ComplianceCategory | None = Query(default=None),
+    module: ComplianceModule | None = Query(default=None),
+    overdue_only: bool = Query(default=False),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    meta: RequestMeta = Depends(get_request_meta),
+    _membership=Depends(require_permission(PermissionCode.COMPLIANCE_REPORT_EXPORT.value)),
+):
+    service = ComplianceReportService(db)
+    file = await service.export_obligations(
+        company_id, format, status=status, category=category, module=module, overdue_only=overdue_only
+    )
+
+    await AuditService(db).log(
+        action=AuditAction.COMPLIANCE_EXPORT_GENERATED,
+        user_id=current_user.id,
+        company_id=company_id,
+        resource_type="compliance_export",
+        resource_id=file.filename,
+        description=f"Compliance obligations report exported as {file.filename}",
+        ip_address=meta.ip_address,
+        user_agent=meta.user_agent,
+    )
+    await db.commit()
+
+    return Response(
+        content=file.content,
+        media_type=file.media_type,
+        headers={"Content-Disposition": safe_content_disposition(file.filename)},
+    )
+
+
+@router.get("/readiness/export")
+async def export_readiness(
+    company_id: uuid.UUID,
+    format: Literal["csv", "xlsx"] = Query(default="csv"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    meta: RequestMeta = Depends(get_request_meta),
+    _membership=Depends(require_permission(PermissionCode.COMPLIANCE_REPORT_EXPORT.value)),
+):
+    service = ComplianceReportService(db)
+    file = await service.export_readiness(company_id, format)
+
+    await AuditService(db).log(
+        action=AuditAction.COMPLIANCE_EXPORT_GENERATED,
+        user_id=current_user.id,
+        company_id=company_id,
+        resource_type="compliance_export",
+        resource_id=file.filename,
+        description=f"Compliance readiness report exported as {file.filename}",
         ip_address=meta.ip_address,
         user_agent=meta.user_agent,
     )
